@@ -654,7 +654,7 @@ async function handleCommand(sess, raw) {
       if (!arg) { ncWrite(sess, col('red', '[hint] Usage: hint <message>') + '\r\n> '); break; }
       const hr = submitHint(arg);
       if (hr.ok) {
-        broadcast({ type: 'hint', data: { text: hr.result.text, timestamp: hr.result.timestamp } });
+        broadcast({ type: 'hint', data: { id: hr.result.id, text: hr.result.text, timestamp: hr.result.timestamp } });
         ncWrite(sess, col('green', `[hint] Sent: "${hr.result.text}"`) + '\r\n> ');
       } else {
         ncWrite(sess, col('red', `[hint] Failed: ${hr.error}`) + '\r\n> ');
@@ -893,10 +893,17 @@ function apiHints() {
     return Array.isArray(h) ? h : [];
   } catch (_) { return []; }
 }
+// Called when the observer sends a hint — lets index.js cancel the RequestHint wait early
+let _onHintReceived = null;
+function setHintReceivedCallback(fn) { _onHintReceived = fn; }
+function clearHintReceivedCallback()  { _onHintReceived = null; }
+
 function submitHint(text) {
   if (!text || !text.trim()) return { ok: false, error: 'hint text is required' };
   const hints = apiHints();
   const entry = { id: `hint_${Date.now()}_${Math.random().toString(36).slice(2,6)}`, text: text.trim(), timestamp: new Date().toISOString(), seen: false, status: 'pending' };
+  // Notify index.js so it can cancel the 30s RequestHint wait early
+  if (_onHintReceived) { try { _onHintReceived(); } catch (_) {} _onHintReceived = null; }
   hints.push(entry);
   try {
     fs.writeFileSync(HINTS_FILE, JSON.stringify(hints, null, 2));
@@ -966,7 +973,7 @@ function start() {
           let text = '';
           try { text = JSON.parse(body).text || ''; } catch (_) { text = body; }
           const r = submitHint(text);
-          if (r.ok) broadcast({ type: 'hint', data: { text: r.result.text, timestamp: r.result.timestamp } });
+          if (r.ok) broadcast({ type: 'hint', data: { id: r.result.id, text: r.result.text, timestamp: r.result.timestamp } });
           return json(r);
         });
       }
@@ -1021,4 +1028,4 @@ if (require.main === module) {
   start();
 }
 
-module.exports = { broadcast, start, stop };
+module.exports = { broadcast, start, stop, setHintReceivedCallback, clearHintReceivedCallback };

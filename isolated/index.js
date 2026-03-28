@@ -196,12 +196,25 @@ async function loop() {
     const result = await dispatcher.dispatch(call.tool, call.args ?? {});
     console.log(`[result]  ok=${result.ok}`, result.error || '');
 
-  // If the AI sent a RequestHint, pause 30s so the observer can respond in time
+  // If the AI sent a RequestHint, pause up to 30s — cancelled immediately if observer responds
   const sentRequestHint = toolCalls.some((c, i) => c.tool === 'RequestHint' && allResults[i]?.ok);
   if (sentRequestHint) {
-    console.log('[NomadAI] Waiting 30s for observer response to RequestHint...');
+    console.log('[NomadAI] Waiting up to 30s for observer response to RequestHint...');
     observerServer.broadcast({ type: 'hint_wait', data: { seconds: 30 } });
-    await new Promise(r => setTimeout(r, 30000));
+    await new Promise(resolve => {
+      let timer;
+      const done = (early) => {
+        clearTimeout(timer);
+        observerServer.clearHintReceivedCallback();
+        if (early) {
+          console.log('[NomadAI] Observer responded — resuming early.');
+          observerServer.broadcast({ type: 'hint_wait_done', data: { early: true } });
+        }
+        resolve();
+      };
+      timer = setTimeout(() => done(false), 30000);
+      observerServer.setHintReceivedCallback(() => done(true));
+    });
   }
     allResults.push({ tool: call.tool, ok: result.ok, error: result.error, result: result.result });
   }
