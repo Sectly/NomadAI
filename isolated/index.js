@@ -152,6 +152,15 @@ async function loop() {
     _consecutiveMalformed++;
     console.warn('[NomadAI] LLM error:', llmResult.error);
     if (llmResult.raw) console.warn('[NomadAI] Raw (first 300):', llmResult.raw.slice(0, 300));
+    observerServer.broadcast({
+      type: 'error',
+      data: {
+        kind: 'malformed_response',
+        error: llmResult.error,
+        raw: llmResult.raw ? llmResult.raw.slice(0, 300) : undefined,
+        consecutive: _consecutiveMalformed,
+      },
+    });
     action = { ...llmResult.fallback };
     // Exponential backoff for repeated parse failures, capped at 30s
     action.args = { ms: Math.min(5000 * _consecutiveMalformed, 30000) };
@@ -187,6 +196,8 @@ async function loop() {
 
   // Tick token preset countdown — auto-resets to normal after PRESET_TTL turns
   llmBridge.tickTokenPreset();
+  // Tick tool cache — evicts stale entries
+  dispatcher.toolCache.tick();
 
   // Auto-summarise episodic memory if getting long
   let ep = [];

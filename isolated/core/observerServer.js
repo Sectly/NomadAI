@@ -516,6 +516,9 @@ async function handleCommand(sess, raw) {
         col('gray','  ──────────────────────────────────────────────────────────') + '\r\n' +
         col('cyan','  hint') + ' <message>          Send a hint to the AI (it may or may not act on it)\r\n' +
         col('gray','  ──────────────────────────────────────────────────────────') + '\r\n' +
+        col('cyan','  cache') + '                  List cached tool results\r\n' +
+        col('cyan','  cache clear') + ' [tool]     Clear cache (all, or specific tool)\r\n' +
+        col('gray','  ──────────────────────────────────────────────────────────') + '\r\n' +
         col('cyan','  time') + '                   Show current time\r\n' +
         col('cyan','  date') + '                   Show current date\r\n' +
         col('gray','  ──────────────────────────────────────────────────────────') + '\r\n' +
@@ -608,6 +611,31 @@ async function handleCommand(sess, raw) {
     case 'currentdate': {
       const now = new Date();
       ncWrite(sess, col('cyan', '[date] ') + now.toLocaleDateString(undefined, { weekday:'long', year:'numeric', month:'long', day:'numeric' }) + '\r\n> ');
+      break;
+    }
+
+    case 'cache': {
+      const { toolCache } = require('./toolDispatcher');
+      const sub = arg.split(' ')[0].toLowerCase();
+      if (sub === 'clear') {
+        const target = arg.split(' ').slice(1).join(' ').trim() || undefined;
+        toolCache.clear(target);
+        ncWrite(sess, col('green', target ? `[cache] Cleared entries for: ${target}` : '[cache] Entire cache cleared') + '\r\n> ');
+      } else {
+        // list (default)
+        const entries = toolCache.list();
+        if (!entries.length) {
+          ncWrite(sess, col('gray', '[cache] Empty — no cached results') + '\r\n> ');
+        } else {
+          ncWrite(sess, col('bold', `[cache] ${entries.length} entries  (TTL ${Math.round(toolCache.CACHE_TTL_MS/1000)}s / ${toolCache.CACHE_MAX_TURNS} turns)\r\n`));
+          for (const e of entries) {
+            const age = e.ageMs < 60000 ? `${Math.round(e.ageMs/1000)}s` : `${Math.round(e.ageMs/60000)}m`;
+            const exp = `expires ${Math.round(e.expiresInMs/1000)}s / ${e.expiresInTurns} turns`;
+            ncWrite(sess, `  ${col('cyan', e.tool.padEnd(20))}  age=${age}  ${col('gray', exp)}\r\n`);
+          }
+          ncWrite(sess, '> ');
+        }
+      }
       break;
     }
 

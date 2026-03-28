@@ -1,5 +1,6 @@
 const path = require('path');
 const safety = require('./safetyValidator');
+const toolCache = require('./toolCache');
 
 let observer = null;
 let episodicAppend = null;
@@ -58,6 +59,14 @@ async function dispatch(toolName, args, ctx) {
     }
   }
 
+  // Return cached result if available
+  const cached = toolCache.get(toolName, args);
+  if (cached !== null) {
+    if (observer) observer.broadcast({ type: 'tool_result', data: { tool: toolName, ok: cached.ok, cached: true } });
+    _log(toolName, args, cached, true);
+    return cached;
+  }
+
   if (observer) observer.broadcast({ type: 'tool_call', data: { tool: toolName, args } });
 
   let result;
@@ -67,14 +76,17 @@ async function dispatch(toolName, args, ctx) {
     result = { ok: false, error: err.message };
   }
 
+  // Cache successful results
+  if (result.ok) toolCache.set(toolName, args, result);
+
   if (observer) observer.broadcast({ type: 'tool_result', data: { tool: toolName, ok: result.ok } });
   _log(toolName, args, result);
   return result;
 }
 
-function _log(toolName, args, result) {
+function _log(toolName, args, result, fromCache = false) {
   if (!episodicAppend) return;
-  const entry = { ts: new Date().toISOString(), tool: toolName, args, ok: result.ok };
+  const entry = { ts: new Date().toISOString(), tool: toolName, args, ok: result.ok, ...(fromCache ? { cached: true } : {}) };
   if (!result.ok && result.error) entry.error = result.error;
   if (result.result !== undefined) {
     const raw = typeof result.result === 'string' ? result.result : JSON.stringify(result.result);
@@ -92,4 +104,4 @@ function listTools() {
   return Object.keys(registry);
 }
 
-module.exports = { dispatch, init, listTools };
+module.exports = { dispatch, init, listTools, toolCache };

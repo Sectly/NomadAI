@@ -42,6 +42,8 @@ Snapshot({label?}) Rollback({snapshotId?}) ListSnapshots({}) DiffSnapshot({fromI
 
 ### Observer / Meta
 Emit({type,data}) SetGoal({goal,priority?}) GetGoal({}) DeleteGoal({index}) ClearGoals({}) SetMood({mood}) Sleep({ms}) SleepUntil({iso}) Introspect({}) SelfReport({})
+ToolCacheList({}) — list all cached tool results with age, TTL, and turns until expiry.
+ToolCacheClear({tool?}) — clear the tool cache. Pass tool name to clear only that tool's entries, omit to clear all.
 SetTokenLimit({preset}) — set your response token limit: 'low' (256), 'normal' (600, default), 'high' (1800). Non-normal presets auto-reset to normal after 5 turns or on restart/rollback. Use high before writing large modules, low for quick status checks.
 GetTokenLimit({}) — return current preset, numPredict, and turnsLeft before auto-reset.
 RequestHint({message?}) — send a message or request to the observer (ask for help, share a thought, say something). A response may or may not come.

@@ -117,6 +117,27 @@ async function HintReject({ id, response = '' }) {
   return r;
 }
 
+// ── Tool cache tools ───────────────────────────────────────────────────────────
+async function ToolCacheList() {
+  const { toolCache } = require('../core/toolDispatcher');
+  const entries = toolCache.list();
+  return {
+    ok: true,
+    result: {
+      count: entries.length,
+      ttlMs: toolCache.CACHE_TTL_MS,
+      maxTurns: toolCache.CACHE_MAX_TURNS,
+      entries,
+    },
+  };
+}
+
+async function ToolCacheClear({ tool } = {}) {
+  const { toolCache } = require('../core/toolDispatcher');
+  toolCache.clear(tool || undefined);
+  return { ok: true, result: tool ? `Cache cleared for tool: ${tool}` : 'Entire tool cache cleared' };
+}
+
 // ── Token limit tools ──────────────────────────────────────────────────────────
 async function SetTokenLimit({ preset }) {
   const llmBridge = require('../core/llmBridge');
@@ -178,4 +199,4 @@ async function SelfReport() {
   return { ok: true, result: report };
 }
 
-module.exports = { Emit, SetGoal, GetGoal, DeleteGoal, ClearGoals, SetTokenLimit, GetTokenLimit, SetMood, Sleep, SleepUntil, Introspect, SelfReport, RequestHint, ListHints, HintRead, HintAccept, HintReject, setBroadcast };
+module.exports = { Emit, SetGoal, GetGoal, DeleteGoal, ClearGoals, ToolCacheList, ToolCacheClear, SetTokenLimit, GetTokenLimit, SetMood, Sleep, SleepUntil, Introspect, SelfReport, RequestHint, ListHints, HintRead, HintAccept, HintReject, setBroadcast };
