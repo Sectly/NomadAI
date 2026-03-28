@@ -577,9 +577,34 @@
                 "hint_wait",
                 "hint_wait_done",
             ]);
-            function addEntry(panel, ev) {
+            const LIVE_STORAGE_KEY = "nomadai_live_events";
+            const LIVE_MAX = 10;
+
+            function saveLiveEvent(ev) {
+                try {
+                    const stored = JSON.parse(localStorage.getItem(LIVE_STORAGE_KEY) || "[]");
+                    stored.push({ ...ev, _ts: new Date().toISOString() });
+                    if (stored.length > LIVE_MAX) stored.splice(0, stored.length - LIVE_MAX);
+                    localStorage.setItem(LIVE_STORAGE_KEY, JSON.stringify(stored));
+                } catch (_) {}
+            }
+
+            function restoreLiveEvents() {
+                try {
+                    const stored = JSON.parse(localStorage.getItem(LIVE_STORAGE_KEY) || "[]");
+                    for (const ev of stored) {
+                        const panel = THOUGHT_TYPES.has(ev.type) ? pThoughts
+                            : ALERT_TYPES.has(ev.type) ? pAlerts : pCommands;
+                        addEntry(panel, ev, true);
+                    }
+                } catch (_) {}
+            }
+
+            function addEntry(panel, ev, restored) {
                 const el = document.createElement("div");
-                const ts = new Date().toLocaleTimeString();
+                const ts = restored && ev._ts
+                    ? new Date(ev._ts).toLocaleTimeString()
+                    : new Date().toLocaleTimeString();
                 let body;
                 let extraClass = "";
                 if (
@@ -600,6 +625,7 @@
                             : String(ev.data || "");
                 }
                 el.className = "entry " + ev.type + extraClass;
+                if (restored) el.style.opacity = "0.55";
                 el.innerHTML =
                     '<span class="ts">' +
                     ts +
@@ -611,6 +637,7 @@
                 panel.scrollTop = panel.scrollHeight;
                 if (panel.children.length > 500)
                     panel.removeChild(panel.firstChild);
+                if (!restored) saveLiveEvent(ev);
             }
             function esc(s) {
                 return String(s)
@@ -824,6 +851,7 @@
                 return ok({});
             }
 
+            restoreLiveEvents();
             function connect() {
                 if (MOCK_MODE) {
                     statusEl.textContent = "mock mode";

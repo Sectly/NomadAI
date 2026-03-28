@@ -93,7 +93,7 @@ async function ListHints({ seen } = {}) {
 }
 
 async function HintRead({ id, response } = {}) {
-  if (!id) return { ok: false, error: 'id is required' };
+  if (id === undefined || id === null) return { ok: false, error: 'id is required' };
   const patch = { seen: true };
   if (response !== undefined && response !== '') patch.response = response;
   else patch.response = '...';
@@ -104,14 +104,14 @@ async function HintRead({ id, response } = {}) {
 }
 
 async function HintAccept({ id, response = '' }) {
-  if (!id) return { ok: false, error: 'id is required' };
+  if (id === undefined || id === null) return { ok: false, error: 'id is required' };
   const r = updateHint(id, { seen: true, status: 'accepted', response, respondedAt: new Date().toISOString() });
   if (r.ok && _broadcast) _broadcast({ type: 'hint_response', data: { id, status: 'accepted', response } });
   return r;
 }
 
 async function HintReject({ id, response = '' }) {
-  if (!id) return { ok: false, error: 'id is required' };
+  if (id === undefined || id === null) return { ok: false, error: 'id is required' };
   const r = updateHint(id, { seen: true, status: 'rejected', response, respondedAt: new Date().toISOString() });
   if (r.ok && _broadcast) _broadcast({ type: 'hint_response', data: { id, status: 'rejected', response } });
   return r;

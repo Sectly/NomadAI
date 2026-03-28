@@ -149,7 +149,7 @@ async function loop() {
   // The agent is free to act on them, ignore them, or acknowledge and move on.
   const pendingHints = loadPendingHints();
   if (pendingHints.length) {
-    const hintLines = pendingHints.map(h => `- "${h.text}"  (sent ${h.timestamp})`).join('\n');
+    const hintLines = pendingHints.map(h => `- [id:"${h.id}"] "${h.text}"  (sent ${h.timestamp})`).join('\n');
     messages.push({
       role: 'user',
       content: `[Observer hints — you may act on these or ignore them entirely]\n${hintLines}`,

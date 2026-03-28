@@ -4,7 +4,7 @@ const TOOL_REF = `
 
 Single tool: {"thought":"...","plan":"...","tool":"Name","args":{}}
 Multi-tool:  {"thought":"...","plan":"...","tools":[{"tool":"Name","args":{}},{"tool":"Other","args":{}}]}
-Tools in a multi-tool call run in sequence. Use it when actions are independent and can be batched.
+Prefer multi-tool when you need multiple independent results in the same turn (e.g. OSInfo + DiskUsage + MemUsage). Tools run in sequence and all results are returned together.
 
 ## Available Tools
 
