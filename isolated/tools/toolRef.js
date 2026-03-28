@@ -20,7 +20,7 @@ Cron({id,schedule,command}) — schedule is a duration string: "30s", "5m", "2h"
 CronList({}) — list all active cron job ids. CronCancel({id}) — stop and remove a cron job.
 
 ### Modules
-TryLoadModule({path}) TryUnloadModule({name}) ReloadModule({name}) TestModule({path}) RunModule({path}) ListModules({})
+TryLoadModule({path}) TryUnloadModule({name}) ReloadModule({name}) TestModule({path}) RunModule({path|name}) ListModules({})
 CallModule({name,fn,args?}) — call an exported function on a loaded module. name=module filename without .js, fn=function name, args=plain object passed as first argument.
 Paths must be in /open/modules/.
 

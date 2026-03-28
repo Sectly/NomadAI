@@ -122,7 +122,10 @@ async function CallModule({ name, fn, args = {} }) {
 // Runs a module as a script in a fresh subprocess and returns its stdout/stderr.
 // The module's top-level code executes; anything written to stdout/stderr is captured.
 // Hard timeout: 45 seconds.
-async function RunModule({ path: p }) {
+async function RunModule({ path: p, name }) {
+  // Accept name as a convenience alias: name="example" → path="/open/modules/example.js"
+  if (!p && name) p = `/open/modules/${name.replace(/\.js$/, '')}.js`;
+  if (!p) return { ok: false, error: 'path or name is required' };
   if (!p.startsWith('/open/modules/')) {
     return { ok: false, error: 'RunModule is restricted to /open/modules/' };
   }
