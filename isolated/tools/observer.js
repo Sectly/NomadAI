@@ -117,6 +117,25 @@ async function HintReject({ id, response = '' }) {
   return r;
 }
 
+// ── Token limit tools ──────────────────────────────────────────────────────────
+async function SetTokenLimit({ preset }) {
+  const llmBridge = require('../core/llmBridge');
+  if (!preset) return { ok: false, error: 'preset is required (low | normal | high)' };
+  const ok = llmBridge.setTokenPreset(preset);
+  if (!ok) return { ok: false, error: `Unknown preset "${preset}" — use low, normal, or high` };
+  const state = llmBridge.getTokenPreset();
+  if (_broadcast) _broadcast({ type: 'token_limit', data: state });
+  const msg = preset === 'normal'
+    ? `Token limit set to normal (${state.numPredict}) — no auto-reset`
+    : `Token limit set to ${preset} (${state.numPredict} tokens) — resets to normal in ${state.turnsLeft} turns`;
+  return { ok: true, result: msg };
+}
+
+async function GetTokenLimit() {
+  const llmBridge = require('../core/llmBridge');
+  return { ok: true, result: llmBridge.getTokenPreset() };
+}
+
 async function SetMood({ mood }) {
   if (_broadcast) _broadcast({ type: 'mood', data: { mood } });
   return { ok: true, result: mood };
@@ -159,4 +178,4 @@ async function SelfReport() {
   return { ok: true, result: report };
 }
 
-module.exports = { Emit, SetGoal, GetGoal, DeleteGoal, ClearGoals, SetMood, Sleep, SleepUntil, Introspect, SelfReport, RequestHint, ListHints, HintRead, HintAccept, HintReject, setBroadcast };
+module.exports = { Emit, SetGoal, GetGoal, DeleteGoal, ClearGoals, SetTokenLimit, GetTokenLimit, SetMood, Sleep, SleepUntil, Introspect, SelfReport, RequestHint, ListHints, HintRead, HintAccept, HintReject, setBroadcast };

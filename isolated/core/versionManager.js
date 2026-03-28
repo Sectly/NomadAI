@@ -65,6 +65,8 @@ async function rollback(snapshotId) {
   );
 
   if (result.exitCode !== 0) return { ok: false, error: result.stderr };
+  // Reset token preset so a restored state doesn't inherit an elevated limit
+  try { require('./llmBridge').resetTokenPreset(); } catch (_) {}
   return { ok: true, result: meta };
 }
 

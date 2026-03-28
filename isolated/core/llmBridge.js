@@ -3,6 +3,37 @@ const LLM_MODEL   = process.env.LLM_MODEL   || 'llama3';
 const LLM_MOCK    = process.env.LLM_MOCK    === 'true';
 const LLM_TIMEOUT = Number(process.env.LLM_TIMEOUT_MS) || 120000; // 2 min default
 
+// ── Token limit presets ────────────────────────────────────────────────────────
+const PRESETS = { low: 256, normal: 600, high: 1800 };
+const DEFAULT_PRESET = 'normal';
+const PRESET_TTL = 5; // turns before auto-reset to normal
+
+let _tokenPreset    = DEFAULT_PRESET;
+let _tokenTurnsLeft = 0;
+
+function setTokenPreset(preset) {
+  if (!PRESETS[preset]) return false;
+  _tokenPreset    = preset;
+  _tokenTurnsLeft = preset === DEFAULT_PRESET ? 0 : PRESET_TTL;
+  return true;
+}
+
+function tickTokenPreset() {
+  if (_tokenTurnsLeft > 0) {
+    _tokenTurnsLeft--;
+    if (_tokenTurnsLeft === 0) _tokenPreset = DEFAULT_PRESET;
+  }
+}
+
+function resetTokenPreset() {
+  _tokenPreset    = DEFAULT_PRESET;
+  _tokenTurnsLeft = 0;
+}
+
+function getTokenPreset() {
+  return { preset: _tokenPreset, numPredict: PRESETS[_tokenPreset], turnsLeft: _tokenTurnsLeft };
+}
+
 const REQUIRED_FIELDS = ['thought', 'plan', 'tool', 'args'];
 
 // ── Mock responses ─────────────────────────────────────────────────────────────
@@ -75,6 +106,7 @@ async function call({ system, messages }) {
     messages: [{ role: 'system', content: system }, ...messages],
     stream: false,
     format: 'json',
+    options: { num_predict: PRESETS[_tokenPreset] },
   });
 
   let raw;
@@ -116,4 +148,4 @@ async function call({ system, messages }) {
   return { ok: true, result: parsed };
 }
 
-module.exports = { call, buildSystemPrompt };
+module.exports = { call, buildSystemPrompt, setTokenPreset, tickTokenPreset, resetTokenPreset, getTokenPreset };

@@ -86,6 +86,7 @@ function getRecentHistory(limit = 10) {
 
 async function boot() {
   console.log('[NomadAI] Booting...');
+  llmBridge.resetTokenPreset();
   observerServer.broadcast({ type: 'boot', data: { timestamp: new Date().toISOString() } });
 
   // Check last restart
@@ -167,6 +168,9 @@ async function loop() {
   if (result.result !== undefined) _pendingResult.result = result.result;
 
   console.log(`[result]  ok=${result.ok}`, result.error || '');
+
+  // Tick token preset countdown — auto-resets to normal after PRESET_TTL turns
+  llmBridge.tickTokenPreset();
 
   // Auto-summarise episodic memory if getting long
   let ep = [];
