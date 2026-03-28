@@ -96,6 +96,9 @@ function extractJson(text) {
 
 function validate(obj) {
   if (!obj || typeof obj !== 'object') return false;
+  // Multi-tool: { thought?, plan?, tools: [{tool, args}, ...] }
+  if (Array.isArray(obj.tools) && obj.tools.length > 0) return true;
+  // Single-tool: { thought?, plan?, tool, args }
   return REQUIRED_FIELDS.every((f) => f in obj);
 }
 
@@ -147,7 +150,11 @@ async function call({ system, messages }) {
     };
   }
 
-  // Patch missing thought/plan so the loop never breaks on a terse response
+  // Normalise: single-tool shorthand → tools array for uniform handling downstream
+  if (!parsed.tools) {
+    parsed.tools = [{ tool: parsed.tool, args: parsed.args ?? {} }];
+  }
+  // Patch missing thought/plan
   if (!parsed.thought) parsed.thought = '...';
   if (!parsed.plan)    parsed.plan    = '...';
 

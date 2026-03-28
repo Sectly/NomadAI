@@ -1,5 +1,11 @@
 // Returns a compact tool reference string injected into the LLM system prompt
 const TOOL_REF = `
+## Response format
+
+Single tool: {"thought":"...","plan":"...","tool":"Name","args":{}}
+Multi-tool:  {"thought":"...","plan":"...","tools":[{"tool":"Name","args":{}},{"tool":"Other","args":{}}]}
+Tools in a multi-tool call run in sequence. Use it when actions are independent and can be batched.
+
 ## Available Tools
 
 All tools return: { ok: boolean, result: any, error?: string }

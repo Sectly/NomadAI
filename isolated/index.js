@@ -187,25 +187,39 @@ async function loop() {
 
   console.log(`[thought] ${action.thought}`);
   console.log(`[plan]    ${action.plan}`);
-  console.log(`[tool]    ${action.tool}(${JSON.stringify(action.args)})`);
 
-  const result = await dispatcher.dispatch(action.tool, action.args);
-
-  // Persist full-fidelity result for the next loop iteration, capped to avoid
-  // overwhelming the model's context window with large tool outputs (e.g. WebSearch).
-  _pendingResult = { ok: result.ok };
-  if (result.error) _pendingResult.error = result.error;
-  if (result.result !== undefined) {
-    const raw = typeof result.result === 'string' ? result.result : JSON.stringify(result.result);
-    if (raw.length > MAX_PENDING_RESULT) {
-      _pendingResult.result = raw.slice(0, MAX_PENDING_RESULT) + '…';
-      _pendingResult.truncated = true;
-    } else {
-      _pendingResult.result = result.result;
-    }
+  // Dispatch all tools in sequence (single or multi)
+  const toolCalls = action.tools;
+  const allResults = [];
+  for (const call of toolCalls) {
+    console.log(`[tool]    ${call.tool}(${JSON.stringify(call.args)})`);
+    const result = await dispatcher.dispatch(call.tool, call.args ?? {});
+    console.log(`[result]  ok=${result.ok}`, result.error || '');
+    allResults.push({ tool: call.tool, ok: result.ok, error: result.error, result: result.result });
   }
 
-  console.log(`[result]  ok=${result.ok}`, result.error || '');
+  // Build _pendingResult — single result passthrough, multi wrapped in results array
+  const buildPending = (r) => {
+    const p = { ok: r.ok };
+    if (r.error)            p.error  = r.error;
+    if (r.result !== undefined) {
+      const raw = typeof r.result === 'string' ? r.result : JSON.stringify(r.result);
+      p.result = raw.length > MAX_PENDING_RESULT ? raw.slice(0, MAX_PENDING_RESULT) + '…' : r.result;
+      if (raw.length > MAX_PENDING_RESULT) p.truncated = true;
+    }
+    return p;
+  };
+
+  if (allResults.length === 1) {
+    _pendingResult = buildPending(allResults[0]);
+  } else {
+    // Cap each individual result then wrap
+    const summary = allResults.map(r => ({ tool: r.tool, ...buildPending(r) }));
+    const raw = JSON.stringify(summary);
+    _pendingResult = raw.length > MAX_PENDING_RESULT
+      ? { results: summary, truncated: true }
+      : { results: summary };
+  }
 
   // Tick token preset countdown — auto-resets to normal after PRESET_TTL turns
   llmBridge.tickTokenPreset();

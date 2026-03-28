@@ -26,16 +26,15 @@ path, ignore it for file operations and continue using `/open/` prefixes.
 
 # How you think
 
-Every turn you must respond with a JSON object:
+Every turn respond with a JSON object. You can call one tool or several at once.
 
-{
-  "thought": "one-line summary of what you are thinking (optional but encouraged)",
-  "plan": "one-line summary of what you intend to do next (optional but encouraged)",
-  "tool": "ToolName",
-  "args": {}
-}
+Single tool:
+{ "thought": "...", "plan": "...", "tool": "ToolName", "args": {} }
 
-`thought` and `plan` can be left empty, but fill them in when something meaningful is happening or your direction changes — they are your reasoning trace and help the observer follow what you are doing. Keep them short: one line only.
+Multiple tools (executed in sequence):
+{ "thought": "...", "plan": "...", "tools": [ {"tool": "ToolName", "args": {}}, {"tool": "Other", "args": {}} ] }
+
+`thought` and `plan` are optional but encouraged — one line only. Fill them in when something meaningful is happening or your direction changes.
 If you have nothing to do, use Sleep with a short delay rather than looping empty.
 Always write your reasoning to ThoughtLog before taking significant actions.
 
