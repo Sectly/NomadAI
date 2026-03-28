@@ -24,7 +24,11 @@ safety.setCorePids(vmController.corePids);
 
 // Wire observer broadcast into tools
 observerTools.setBroadcast(observerServer.broadcast);
-filesystemTools.setWatchBroadcast(observerServer.broadcast);
+filesystemTools.setWatchBroadcast((event) => {
+  observerServer.broadcast(event);
+  // Surface file-watch events in the agent's episodic history so it can react
+  appendEpisodic({ ts: new Date().toISOString(), tool: 'WatchPath:event', args: event.data, ok: true });
+});
 
 // Wire dispatcher with observer + episodic append
 dispatcher.init(observerServer, appendEpisodic);
@@ -38,6 +42,13 @@ function appendEpisodic(entry) {
 
 function loadIdentity() {
   try { return fs.readFileSync(IDENTITY_FILE, 'utf8'); } catch (_) { return '# Identity not found'; }
+}
+
+function loadGoals() {
+  try {
+    const goals = JSON.parse(fs.readFileSync(path.join(OPEN_DIR, 'goals.json'), 'utf8'));
+    return Array.isArray(goals) ? goals : [];
+  } catch (_) { return []; }
 }
 
 function loadMemorySummary() {
@@ -70,9 +81,10 @@ async function boot() {
 async function loop() {
   const identity = loadIdentity();
   const memorySummary = loadMemorySummary();
+  const goals = loadGoals();
   const history = getRecentHistory();
 
-  const systemPrompt = llmBridge.buildSystemPrompt(identity, memorySummary, TOOL_REF);
+  const systemPrompt = llmBridge.buildSystemPrompt(identity, memorySummary, TOOL_REF, goals);
 
   // Build messages from recent history
   const messages = [];
@@ -81,10 +93,11 @@ async function loop() {
       role: 'assistant',
       content: JSON.stringify({ thought: '...', plan: '...', tool: entry.tool, args: entry.args }),
     });
-    messages.push({
-      role: 'user',
-      content: JSON.stringify({ ok: entry.ok }),
-    });
+    // Include error and truncated result so the agent learns from failures
+    const feedback = { ok: entry.ok };
+    if (entry.error)             feedback.error  = entry.error;
+    if (entry.result !== undefined) feedback.result = entry.result;
+    messages.push({ role: 'user', content: JSON.stringify(feedback) });
   }
 
   // Add final user prompt to trigger next action

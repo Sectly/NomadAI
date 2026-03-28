@@ -45,6 +45,14 @@ async function Sleep({ ms }) {
   return { ok: true, result: `Slept ${ms}ms` };
 }
 
+async function SleepUntil({ iso }) {
+  const target = new Date(iso).getTime();
+  if (isNaN(target)) return { ok: false, error: `Invalid ISO timestamp: ${iso}` };
+  const ms = target - Date.now();
+  if (ms > 0) await new Promise((r) => setTimeout(r, ms));
+  return { ok: true, result: `Resumed at ${new Date().toISOString()}` };
+}
+
 async function Introspect() {
   const dispatcher = require('../core/toolDispatcher');
   const memMod = require('./memory');
@@ -69,4 +77,4 @@ async function SelfReport() {
   return { ok: true, result: report };
 }
 
-module.exports = { Emit, SetGoal, GetGoal, SetMood, Sleep, Introspect, SelfReport, setBroadcast };
+module.exports = { Emit, SetGoal, GetGoal, SetMood, Sleep, SleepUntil, Introspect, SelfReport, setBroadcast };

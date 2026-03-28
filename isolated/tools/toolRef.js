@@ -14,6 +14,7 @@ Never use real OS paths. Writes blocked outside /open/. Reads allowed from /open
 Execute({command,cwd?,timeout?}) KillProcess({pid}) ListProcesses({}) GetEnv({key?}) SetEnv({key,value})
 InstallPackage({name,manager}) RemovePackage({name,manager}) ListPackages({manager}) Stdin({pid,input})
 Cron({id,schedule,command}) — schedule is a duration string: "30s", "5m", "2h". Repeats until process exits.
+CronList({}) — list all active cron job ids. CronCancel({id}) — stop and remove a cron job.
 
 ### Modules
 TryLoadModule({path}) TryUnloadModule({name}) ReloadModule({name}) TestModule({path}) RunModule({path}) ListModules({})
@@ -36,7 +37,7 @@ Note: WebSocket({url}) exists but is not supported in this environment — use H
 Snapshot({label?}) Rollback({snapshotId?}) ListSnapshots({}) DiffSnapshot({fromId,toId?}) CommitNote({snapshotId,message}) RestoreFile({path,snapshotId?}) PruneSnapshots({})
 
 ### Observer / Meta
-Emit({type,data}) SetGoal({goal,priority?}) GetGoal({}) SetMood({mood}) Sleep({ms}) Introspect({}) SelfReport({})
+Emit({type,data}) SetGoal({goal,priority?}) GetGoal({}) SetMood({mood}) Sleep({ms}) SleepUntil({iso}) Introspect({}) SelfReport({})
 `;
 
 module.exports = TOOL_REF;

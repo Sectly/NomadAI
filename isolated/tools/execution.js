@@ -93,6 +93,20 @@ async function Cron({ schedule, command, id }) {
   return { ok: true, result: `Cron "${id}" scheduled every ${schedule} → ${command}` };
 }
 
+async function CronList() {
+  const jobs = [];
+  for (const [id] of cronJobs) jobs.push({ id });
+  return { ok: true, result: jobs };
+}
+
+async function CronCancel({ id }) {
+  if (!id) return { ok: false, error: 'id is required' };
+  if (!cronJobs.has(id)) return { ok: false, error: `No cron job with id "${id}"` };
+  clearInterval(cronJobs.get(id));
+  cronJobs.delete(id);
+  return { ok: true, result: `Cron "${id}" cancelled` };
+}
+
 async function Stdin({ pid, input }) {
   if (!/^\d+$/.test(String(pid))) return { ok: false, error: `Invalid pid: ${pid}` };
   // Use printf and pass input via a here-string to avoid shell injection
@@ -113,5 +127,5 @@ async function Stdin({ pid, input }) {
 
 module.exports = {
   Execute, KillProcess, ListProcesses, GetEnv, SetEnv,
-  InstallPackage, RemovePackage, ListPackages, Cron, Stdin,
+  InstallPackage, RemovePackage, ListPackages, Cron, CronList, CronCancel, Stdin,
 };

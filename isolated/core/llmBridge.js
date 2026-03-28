@@ -29,9 +29,13 @@ function mockCall() {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-function buildSystemPrompt(identity, memorySummary, toolRef) {
+function buildSystemPrompt(identity, memorySummary, toolRef, goals) {
+  const goalSection = (Array.isArray(goals) && goals.length)
+    ? '\n\n# Current Goals\n' + goals.map((g) => `- [${g.priority || 'normal'}] ${g.goal}`).join('\n')
+    : '\n\n# Current Goals\n(none — consider setting one with SetGoal)';
   return [
     identity,
+    goalSection,
     '\n\n# Memory Summary\n',
     memorySummary || '(no long-term memory yet)',
     '\n\n# Tool Reference\n',
