@@ -148,8 +148,8 @@ async function call({ system, messages }) {
   }
 
   // Patch missing thought/plan so the loop never breaks on a terse response
-  if (!parsed.thought) parsed.thought = '';
-  if (!parsed.plan)    parsed.plan    = '';
+  if (!parsed.thought) parsed.thought = '...';
+  if (!parsed.plan)    parsed.plan    = '...';
 
   return { ok: true, result: parsed };
 }
