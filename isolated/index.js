@@ -174,9 +174,8 @@ async function loop() {
         consecutive: _consecutiveMalformed,
       },
     });
-    action = { ...llmResult.fallback };
-    // Exponential backoff for repeated parse failures, capped at 30s
-    action.args = { ms: Math.min(5000 * _consecutiveMalformed, 30000) };
+    const ms = Math.min(5000 * _consecutiveMalformed, 30000);
+    action = { ...llmResult.fallback, tools: [{ tool: 'Sleep', args: { ms } }] };
   } else {
     _consecutiveMalformed = 0;
     action = llmResult.result;
