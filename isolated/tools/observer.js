@@ -199,4 +199,84 @@ async function SelfReport() {
   return { ok: true, result: report };
 }
 
-module.exports = { Emit, SetGoal, GetGoal, DeleteGoal, ClearGoals, ToolCacheList, ToolCacheClear, SetTokenLimit, GetTokenLimit, SetMood, Sleep, SleepUntil, Introspect, SelfReport, RequestHint, ListHints, HintRead, HintAccept, HintReject, setBroadcast };
+async function QuickStat() {
+  const fs = require('fs');
+  const path = require('path');
+  const OPEN_DIR = path.resolve(__dirname, '../../open');
+
+  const readJson = (f, fallback) => {
+    try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch (_) { return fallback; }
+  };
+
+  // Memory
+  const lt = readJson(path.join(OPEN_DIR, 'memory/longTerm.json'), {});
+  const ltKeys = Object.keys(lt).filter(k => k !== '_episodic_summary');
+  const ep = readJson(path.join(OPEN_DIR, 'memory/episodic.json'), []);
+  const lastAction = ep.length > 0 ? ep[ep.length - 1] : null;
+
+  // Thoughts log
+  let thoughtLines = 0;
+  try {
+    const content = fs.readFileSync(path.join(OPEN_DIR, 'thoughts.log'), 'utf8');
+    thoughtLines = content.split('\n').filter(Boolean).length;
+  } catch (_) {}
+
+  // Hints
+  const hints = readJson(path.join(OPEN_DIR, 'hints.json'), []);
+  const hintPending   = hints.filter(h => !h.seen).length;
+  const hintResponded = hints.filter(h => h.response).length;
+
+  // Goals
+  const goals = readJson(path.join(OPEN_DIR, 'goals.json'), []);
+
+  // Snapshots
+  let snapCount = 0;
+  let latestSnap = null;
+  try {
+    const snapsDir = path.join(OPEN_DIR, 'snapshots');
+    const snapFiles = fs.readdirSync(snapsDir).filter(f => f.endsWith('.json'));
+    snapCount = snapFiles.length;
+    if (snapCount > 0) {
+      const metas = snapFiles.map(f => {
+        try { return JSON.parse(fs.readFileSync(path.join(snapsDir, f), 'utf8')); } catch (_) { return null; }
+      }).filter(Boolean);
+      metas.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
+      if (metas[0]) latestSnap = { id: metas[0].id, label: metas[0].label, ts: metas[0].timestamp };
+    }
+  } catch (_) {}
+
+  // Restarts
+  const restarts = readJson(path.join(OPEN_DIR, 'restarts.json'), []);
+  const lastRestart = restarts.length > 0 ? restarts[restarts.length - 1] : null;
+
+  // Tool cache + token
+  const { toolCache } = require('../core/toolDispatcher');
+  const tokenState = require('../core/llmBridge').getTokenPreset();
+
+  // Loaded modules
+  const modulesResult = await require('./modules').ListModules();
+  const moduleNames = Array.isArray(modulesResult.result) ? modulesResult.result.map(m => m.name || m) : [];
+
+  return {
+    ok: true,
+    result: {
+      memory: {
+        longTermKeys: ltKeys.length,
+        episodicEntries: ep.length,
+        hasSummary: '_episodic_summary' in lt,
+      },
+      thoughts: { lines: thoughtLines },
+      hints: { total: hints.length, pending: hintPending, responded: hintResponded },
+      goals: { count: goals.length, items: goals.map(g => g.goal) },
+      cache: { entries: toolCache.size() },
+      token: tokenState,
+      modules: { count: moduleNames.length, names: moduleNames },
+      snapshots: { count: snapCount, latest: latestSnap },
+      restarts: { count: restarts.length, last: lastRestart ? { reason: lastRestart.reason, status: lastRestart.status, ts: lastRestart.requestedAt } : null },
+      lastAction: lastAction ? { tool: lastAction.tool, args: lastAction.args, ts: lastAction.ts, ok: lastAction.ok } : null,
+      uptime: Math.floor(process.uptime()),
+    },
+  };
+}
+
+module.exports = { Emit, SetGoal, GetGoal, DeleteGoal, ClearGoals, ToolCacheList, ToolCacheClear, SetTokenLimit, GetTokenLimit, SetMood, Sleep, SleepUntil, Introspect, SelfReport, QuickStat, RequestHint, ListHints, HintRead, HintAccept, HintReject, setBroadcast };

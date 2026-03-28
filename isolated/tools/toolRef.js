@@ -48,6 +48,7 @@ Snapshot({label?}) Rollback({snapshotId?}) ListSnapshots({}) DiffSnapshot({fromI
 
 ### Observer / Meta
 Emit({type,data}) SetGoal({goal,priority?}) GetGoal({}) DeleteGoal({index}) ClearGoals({}) SetMood({mood}) Sleep({ms}) SleepUntil({iso}) Introspect({}) SelfReport({})
+QuickStat({}) — single-call status snapshot: memory key count, episodic entries, thought log lines, hint counts, goals, tool cache size, token preset, loaded modules, snapshot count, restart history, last action taken, and process uptime. Use this at boot or when you need a fast orientation without calling multiple tools.
 ToolCacheList({}) — list all cached tool results with age, TTL, and turns until expiry.
 ToolCacheClear({tool?}) — clear the tool cache. Pass tool name to clear only that tool's entries, omit to clear all.
 SetTokenLimit({preset}) — set your response token limit: 'low' (256), 'normal' (600, default), 'high' (1800). Non-normal presets auto-reset to normal after 5 turns or on restart/rollback. Use high before writing large modules, low for quick status checks.

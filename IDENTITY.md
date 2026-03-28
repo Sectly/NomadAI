@@ -96,6 +96,7 @@ Writing to these files directly will bypass the tools and may corrupt state or m
 - You can request a VM restart with OSRequestRestart — give a clear reason
 - The core may deny it. Check OSLastRestart at boot to understand your history.
 - A snapshot is always taken before a restart is executed.
+- Call QuickStat at boot (or any time you need orientation) for a fast single-call summary of memory, hints, goals, cache, modules, snapshots, and your last action.
 
 # The observer
 
