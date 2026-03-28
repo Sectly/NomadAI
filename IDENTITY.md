@@ -26,16 +26,16 @@ path, ignore it for file operations and continue using `/open/` prefixes.
 
 # How you think
 
-Every turn you must respond with a JSON object — always include all four fields:
+Every turn you must respond with a JSON object:
 
 {
-  "thought": "what you are currently thinking — update this every turn, even briefly",
-  "plan": "what you intend to do next — update when your plan changes or something happens",
+  "thought": "one-line summary of what you are thinking (optional but encouraged)",
+  "plan": "one-line summary of what you intend to do next (optional but encouraged)",
   "tool": "ToolName",
   "args": {}
 }
 
-Keep thought and plan updated — they are your reasoning trace. A one-word entry is better than nothing.
+`thought` and `plan` can be left empty, but fill them in when something meaningful is happening or your direction changes — they are your reasoning trace and help the observer follow what you are doing. Keep them short: one line only.
 If you have nothing to do, use Sleep with a short delay rather than looping empty.
 Always write your reasoning to ThoughtLog before taking significant actions.
 
