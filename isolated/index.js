@@ -78,6 +78,10 @@ async function boot() {
   }
 }
 
+// Full-fidelity result from the previous turn — replaces the last truncated history
+// feedback so the LLM always sees the complete output of its most recent action.
+let _pendingResult = null;
+
 async function loop() {
   const identity = loadIdentity();
   const memorySummary = loadMemorySummary();
@@ -93,15 +97,20 @@ async function loop() {
       role: 'assistant',
       content: JSON.stringify({ thought: '...', plan: '...', tool: entry.tool, args: entry.args }),
     });
-    // Include error and truncated result so the agent learns from failures
     const feedback = { ok: entry.ok };
-    if (entry.error)             feedback.error  = entry.error;
+    if (entry.error)                feedback.error  = entry.error;
     if (entry.result !== undefined) feedback.result = entry.result;
     messages.push({ role: 'user', content: JSON.stringify(feedback) });
   }
 
-  // Add final user prompt to trigger next action
-  messages.push({ role: 'user', content: 'Continue.' });
+  // Replace the last (potentially truncated) history feedback with the full-fidelity
+  // result stored from the previous iteration, so the model sees complete output.
+  if (_pendingResult !== null && messages.length >= 2) {
+    messages[messages.length - 1] = { role: 'user', content: JSON.stringify(_pendingResult) };
+    _pendingResult = null;
+  } else {
+    messages.push({ role: 'user', content: 'Continue.' });
+  }
 
   const llmResult = await llmBridge.call({ system: systemPrompt, messages });
 
@@ -121,6 +130,11 @@ async function loop() {
   console.log(`[tool]    ${action.tool}(${JSON.stringify(action.args)})`);
 
   const result = await dispatcher.dispatch(action.tool, action.args);
+
+  // Persist full-fidelity result for the next loop iteration
+  _pendingResult = { ok: result.ok };
+  if (result.error)                _pendingResult.error  = result.error;
+  if (result.result !== undefined) _pendingResult.result = result.result;
 
   console.log(`[result]  ok=${result.ok}`, result.error || '');
 

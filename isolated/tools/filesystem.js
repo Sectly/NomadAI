@@ -23,12 +23,32 @@ function isAllowedWrite(p) {
   return p.startsWith('/open/');
 }
 
-async function ReadFile({ path: p }) {
+async function ReadFile({ path: p, offset, limit }) {
   if (!isAllowedRead(p)) return { ok: false, error: `Read blocked: ${p}` };
   const real = resolvePath(p);
   try {
     const content = fs.readFileSync(real, 'utf8');
+    if (offset !== undefined || limit !== undefined) {
+      const lines = content.split('\n');
+      const start = Number(offset) || 0;
+      const slice = limit !== undefined ? lines.slice(start, start + Number(limit)) : lines.slice(start);
+      return { ok: true, result: slice.join('\n'), totalLines: lines.length, offset: start };
+    }
     return { ok: true, result: content };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+async function AppendFile({ path: p, content }) {
+  if (!isAllowedWrite(p)) return { ok: false, error: `Write blocked: ${p}` };
+  const check = safety.validateWritePath(p);
+  if (!check.safe) return { ok: false, error: check.reason };
+  const real = resolvePath(p);
+  try {
+    fs.mkdirSync(path.dirname(real), { recursive: true });
+    fs.appendFileSync(real, content, 'utf8');
+    return { ok: true, result: 'appended' };
   } catch (e) {
     return { ok: false, error: e.message };
   }
@@ -149,17 +169,56 @@ function toVirtualPath(realAbs) {
   return realAbs;
 }
 
-async function ListFiles({ path: p }) {
+async function GrepFiles({ path: p, pattern, recursive = false }) {
   const real = resolvePath(p);
-  try {
-    const entries = fs.readdirSync(real, { withFileTypes: true });
-    const files = entries
-      .filter(e => e.isFile())
-      .map(e => {
-        const abs = path.join(real, e.name);
-        const stat = fs.statSync(abs);
-        return { name: e.name, path: toVirtualPath(abs), absolutePath: abs, size: stat.size, modified: stat.mtime };
+  let re;
+  try { re = new RegExp(pattern); } catch (e) { return { ok: false, error: `Invalid pattern: ${e.message}` }; }
+  const results = [];
+  function searchFile(abs) {
+    try {
+      const lines = fs.readFileSync(abs, 'utf8').split('\n');
+      lines.forEach((line, i) => {
+        if (re.test(line)) results.push({ file: toVirtualPath(abs), line: i + 1, content: line });
       });
+    } catch (_) {}
+  }
+  function searchDir(dir) {
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return; }
+    for (const e of entries) {
+      const abs = path.join(dir, e.name);
+      if (e.isFile()) searchFile(abs);
+      else if (e.isDirectory() && recursive) searchDir(abs);
+    }
+  }
+  try {
+    const stat = fs.statSync(real);
+    if (stat.isDirectory()) searchDir(real);
+    else searchFile(real);
+    return { ok: true, result: results };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+async function ListFiles({ path: p, recursive = false }) {
+  const real = resolvePath(p);
+  const files = [];
+  function collect(dir) {
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return; }
+    for (const e of entries) {
+      const abs = path.join(dir, e.name);
+      if (e.isFile()) {
+        const stat = fs.statSync(abs);
+        files.push({ name: e.name, path: toVirtualPath(abs), absolutePath: abs, size: stat.size, modified: stat.mtime });
+      } else if (e.isDirectory() && recursive) {
+        collect(abs);
+      }
+    }
+  }
+  try {
+    collect(real);
     return { ok: true, result: files };
   } catch (e) {
     return { ok: false, error: e.message };
@@ -186,15 +245,23 @@ async function ListDirs({ path: p }) {
 let _watchBroadcast = null;
 function setWatchBroadcast(fn) { _watchBroadcast = fn; }
 
+const _watchHandles = new Map();
+
 async function WatchPath({ path: p, eventTypes = ['change'] }) {
   if (!isAllowedRead(p)) return { ok: false, error: `WatchPath blocked: ${p}` };
   const real = resolvePath(p);
+  // Close any existing watcher for this path to prevent handle leaks
+  if (_watchHandles.has(p)) {
+    try { _watchHandles.get(p).close(); } catch (_) {}
+    _watchHandles.delete(p);
+  }
   try {
-    fs.watch(real, (event, filename) => {
+    const watcher = fs.watch(real, (event, filename) => {
       if (eventTypes.includes(event) && _watchBroadcast) {
         _watchBroadcast({ type: 'watch', data: { path: p, event, filename } });
       }
     });
+    _watchHandles.set(p, watcher);
     return { ok: true, result: `Watching ${p}` };
   } catch (e) {
     return { ok: false, error: e.message };
@@ -202,7 +269,7 @@ async function WatchPath({ path: p, eventTypes = ['change'] }) {
 }
 
 module.exports = {
-  ReadFile, WriteFile, DeleteFile, MoveFile, CopyFile,
-  CheckFile, StatPath, NewDir, ReadDir, ListFiles, ListDirs, CheckDir, DeleteDir, WatchPath,
+  ReadFile, AppendFile, WriteFile, DeleteFile, MoveFile, CopyFile,
+  CheckFile, StatPath, NewDir, ReadDir, GrepFiles, ListFiles, ListDirs, CheckDir, DeleteDir, WatchPath,
   setWatchBroadcast,
 };

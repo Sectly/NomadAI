@@ -5,8 +5,11 @@ const TOOL_REF = `
 All tools return: { ok: boolean, result: any, error?: string }
 
 ### Filesystem
-ReadFile({path}) WriteFile({path,content}) DeleteFile({path}) MoveFile({from,to}) CopyFile({from,to})
-CheckFile({path}) StatPath({path}) NewDir({path}) ReadDir({path}) ListFiles({path}) ListDirs({path}) CheckDir({path}) DeleteDir({path,recursive}) WatchPath({path,eventTypes})
+ReadFile({path,offset?,limit?}) — offset/limit are line numbers for chunked reading; returns totalLines when used.
+AppendFile({path,content}) WriteFile({path,content}) DeleteFile({path}) MoveFile({from,to}) CopyFile({from,to})
+CheckFile({path}) StatPath({path}) NewDir({path}) ReadDir({path})
+GrepFiles({path,pattern,recursive?}) — regex search across file(s); returns [{file,line,content}]
+ListFiles({path,recursive?}) ListDirs({path}) CheckDir({path}) DeleteDir({path,recursive}) WatchPath({path,eventTypes})
 ALWAYS use virtual paths: /open/... for your sector, /tmp/... for scratch.
 Never use real OS paths. Writes blocked outside /open/. Reads allowed from /open/ and /tmp/.
 
@@ -22,8 +25,8 @@ CallModule({name,fn,args?}) — call an exported function on a loaded module. na
 Paths must be in /open/modules/.
 
 ### Memory
-MemoryRead({key}) MemoryWrite({key,value,tags?}) MemorySearch({query}) MemoryForget({key})
-MemorySummarise({}) History({limit?}) ThoughtLog({entry})
+MemoryRead({key}) MemoryWrite({key,value,tags?}) MemorySearch({query}) MemoryList({tag?}) MemoryForget({key})
+MemorySummarise({}) History({limit?}) ThoughtLog({entry}) ThoughtHistory({limit?})
 
 ### System Info
 OSInfo({}) BunInfo({}) DiskUsage({path?}) MemUsage({}) CPUInfo({}) NetworkInfo({}) Uptime({}) TimeNow({})
@@ -37,7 +40,7 @@ Note: WebSocket({url}) exists but is not supported in this environment — use H
 Snapshot({label?}) Rollback({snapshotId?}) ListSnapshots({}) DiffSnapshot({fromId,toId?}) CommitNote({snapshotId,message}) RestoreFile({path,snapshotId?}) PruneSnapshots({})
 
 ### Observer / Meta
-Emit({type,data}) SetGoal({goal,priority?}) GetGoal({}) SetMood({mood}) Sleep({ms}) SleepUntil({iso}) Introspect({}) SelfReport({})
+Emit({type,data}) SetGoal({goal,priority?}) GetGoal({}) DeleteGoal({index}) ClearGoals({}) SetMood({mood}) Sleep({ms}) SleepUntil({iso}) Introspect({}) SelfReport({})
 `;
 
 module.exports = TOOL_REF;

@@ -78,7 +78,12 @@ function _log(toolName, args, result) {
   if (!result.ok && result.error) entry.error = result.error;
   if (result.result !== undefined) {
     const raw = typeof result.result === 'string' ? result.result : JSON.stringify(result.result);
-    entry.result = raw.length <= 400 ? result.result : raw.slice(0, 400) + '…';
+    if (raw.length <= 1500) {
+      entry.result = result.result;
+    } else {
+      entry.result = raw.slice(0, 1500) + '…';
+      entry.truncated = true;
+    }
   }
   episodicAppend(entry);
 }

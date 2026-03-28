@@ -76,9 +76,26 @@ async function MemorySummarise() {
   return { ok: true, result: `Summarised ${ep.length} entries` };
 }
 
+async function MemoryList({ tag } = {}) {
+  const lt = loadLT();
+  const entries = Object.entries(lt).map(([key, entry]) => ({ key, ...entry }));
+  const filtered = tag ? entries.filter((e) => (e.tags || []).includes(tag)) : entries;
+  return { ok: true, result: filtered };
+}
+
 async function History({ limit = 20 }) {
   const ep = loadEp();
   return { ok: true, result: ep.slice(-limit) };
+}
+
+async function ThoughtHistory({ limit = 20 }) {
+  try {
+    const content = fs.readFileSync(THOUGHTS_FILE, 'utf8');
+    const lines = content.split('\n').filter(Boolean);
+    return { ok: true, result: lines.slice(-limit) };
+  } catch (_) {
+    return { ok: true, result: [] };
+  }
 }
 
 async function ThoughtLog({ entry }) {
@@ -87,4 +104,4 @@ async function ThoughtLog({ entry }) {
   return { ok: true, result: 'logged' };
 }
 
-module.exports = { MemoryRead, MemoryWrite, MemorySearch, MemoryForget, MemorySummarise, History, ThoughtLog };
+module.exports = { MemoryRead, MemoryWrite, MemorySearch, MemoryList, MemoryForget, MemorySummarise, History, ThoughtHistory, ThoughtLog };

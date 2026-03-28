@@ -35,6 +35,22 @@ async function GetGoal() {
   return { ok: true, result: loadGoals() };
 }
 
+async function DeleteGoal({ index }) {
+  const goals = loadGoals();
+  const i = Number(index);
+  if (isNaN(i) || i < 0 || i >= goals.length) {
+    return { ok: false, error: `Index ${index} out of range (${goals.length} goals)` };
+  }
+  const removed = goals.splice(i, 1)[0];
+  saveGoals(goals);
+  return { ok: true, result: removed };
+}
+
+async function ClearGoals() {
+  saveGoals([]);
+  return { ok: true, result: 'All goals cleared' };
+}
+
 async function SetMood({ mood }) {
   if (_broadcast) _broadcast({ type: 'mood', data: { mood } });
   return { ok: true, result: mood };
@@ -77,4 +93,4 @@ async function SelfReport() {
   return { ok: true, result: report };
 }
 
-module.exports = { Emit, SetGoal, GetGoal, SetMood, Sleep, SleepUntil, Introspect, SelfReport, setBroadcast };
+module.exports = { Emit, SetGoal, GetGoal, DeleteGoal, ClearGoals, SetMood, Sleep, SleepUntil, Introspect, SelfReport, setBroadcast };
