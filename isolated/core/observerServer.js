@@ -1013,7 +1013,7 @@ const HTML = `<!DOCTYPE html>
     const tree = document.getElementById('file-tree');
     tree.innerHTML = '';
     if (data.error) { tree.innerHTML = '<div class="item" style="color:#ff5e5e">'+esc(data.error)+'</div>'; return; }
-    const label = '/open/' + (rel ? rel.replace(/^\//,'') : '');
+    const label = '/open/' + (rel ? (rel.startsWith('/') ? rel.slice(1) : rel) : '');
     const bc = document.createElement('div');
     bc.className='breadcrumb'; bc.textContent=label; tree.appendChild(bc);
     if (rel) {
