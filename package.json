@@ -4,6 +4,7 @@
   "type": "commonjs",
   "scripts": {
     "start": "bun run isolated/index.js",
-    "observer": "bun run isolated/core/observerServer.js"
+    "observer": "bun run isolated/core/observerServer.js",
+    "reset": "bash reset.sh"
   }
 }

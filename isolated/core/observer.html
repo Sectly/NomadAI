@@ -41,6 +41,14 @@
             #status.connected {
                 color: #a8ff78;
             }
+            #ai-state {
+                display: flex;
+                gap: 10px;
+                font-size: 11px;
+                color: #555;
+            }
+            #ai-mood { color: #f0a500; }
+            #ai-token { color: #7ec8e3; }
             #tabs {
                 display: flex;
                 gap: 0;
@@ -438,6 +446,10 @@
     <body>
         <div id="topbar">
             <h1>NomadAI Observer</h1>
+            <div id="ai-state">
+                <span id="ai-mood"></span>
+                <span id="ai-token"></span>
+            </div>
             <span id="status">disconnected</span>
         </div>
         <div id="tabs">
@@ -888,6 +900,11 @@
                 ws.onmessage = (e) => {
                     try {
                         const ev = JSON.parse(e.data);
+                        if (ev.type === "mood" && ev.data?.mood)
+                            document.getElementById("ai-mood").textContent = "mood: " + ev.data.mood;
+                        if (ev.type === "token_limit" && ev.data)
+                            document.getElementById("ai-token").textContent =
+                                "tokens: " + ev.data.preset + " (" + ev.data.numPredict + ")";
                         if (THOUGHT_TYPES.has(ev.type)) addEntry(pThoughts, ev);
                         else if (ALERT_TYPES.has(ev.type))
                             addEntry(pAlerts, ev);
