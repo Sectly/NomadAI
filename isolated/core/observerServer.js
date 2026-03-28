@@ -516,6 +516,9 @@ async function handleCommand(sess, raw) {
         col('gray','  ──────────────────────────────────────────────────────────') + '\r\n' +
         col('cyan','  hint') + ' <message>          Send a hint to the AI (it may or may not act on it)\r\n' +
         col('gray','  ──────────────────────────────────────────────────────────') + '\r\n' +
+        col('cyan','  time') + '                   Show current time\r\n' +
+        col('cyan','  date') + '                   Show current date\r\n' +
+        col('gray','  ──────────────────────────────────────────────────────────') + '\r\n' +
         col('cyan','  who') + '                    Show active observer connections\r\n' +
         col('cyan','  clear') + '                  Clear terminal screen\r\n' +
         col('cyan','  quit') + '                   Disconnect\r\n\r\n> '
@@ -591,6 +594,20 @@ async function handleCommand(sess, raw) {
         if (r.outcome) ncWrite(sess, `    ${col('gray','outcome:')} ${r.outcome}\r\n`);
       }
       ncWrite(sess, '> ');
+      break;
+    }
+
+    case 'time':
+    case 'currenttime': {
+      const now = new Date();
+      ncWrite(sess, col('cyan', '[time] ') + now.toLocaleTimeString() + '  ' + col('gray', now.toISOString()) + '\r\n> ');
+      break;
+    }
+
+    case 'date':
+    case 'currentdate': {
+      const now = new Date();
+      ncWrite(sess, col('cyan', '[date] ') + now.toLocaleDateString(undefined, { weekday:'long', year:'numeric', month:'long', day:'numeric' }) + '\r\n> ');
       break;
     }
 
