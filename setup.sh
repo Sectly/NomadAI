@@ -256,6 +256,7 @@ mkdir -p \
 [ -f "${NOMAD_DIR}/open/memory/episodic.json" ] || echo '[]' > "${NOMAD_DIR}/open/memory/episodic.json"
 [ -f "${NOMAD_DIR}/open/goals.json" ]           || echo '[]' > "${NOMAD_DIR}/open/goals.json"
 [ -f "${NOMAD_DIR}/open/restarts.json" ]        || echo '[]' > "${NOMAD_DIR}/open/restarts.json"
+[ -f "${NOMAD_DIR}/open/hints.json" ]           || echo '[]' > "${NOMAD_DIR}/open/hints.json"
 
 [ -f "${NOMAD_DIR}/open/thoughts.log" ] \
   || touch "${NOMAD_DIR}/open/thoughts.log"

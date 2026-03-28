@@ -19,6 +19,7 @@ const LT_FILE       = path.join(OPEN_DIR, 'memory/longTerm.json');
 const EP_FILE       = path.join(OPEN_DIR, 'memory/episodic.json');
 const SNAPSHOTS_DIR  = path.join(OPEN_DIR, 'snapshots');
 const RESTARTS_FILE  = path.join(OPEN_DIR, 'restarts.json');
+const HINTS_FILE     = path.join(OPEN_DIR, 'hints.json');
 
 // ── ANSI color helpers ────────────────────────────────────────────────────────
 const C = {
@@ -513,6 +514,8 @@ async function handleCommand(sess, raw) {
         col('cyan','  ls') + ' [path]              List files in /open/ (or subdir)\r\n' +
         col('cyan','  cat') + ' <path>             Read a file in /open/\r\n' +
         col('gray','  ──────────────────────────────────────────────────────────') + '\r\n' +
+        col('cyan','  hint') + ' <message>          Send a hint to the AI (it may or may not act on it)\r\n' +
+        col('gray','  ──────────────────────────────────────────────────────────') + '\r\n' +
         col('cyan','  who') + '                    Show active observer connections\r\n' +
         col('cyan','  clear') + '                  Clear terminal screen\r\n' +
         col('cyan','  quit') + '                   Disconnect\r\n\r\n> '
@@ -588,6 +591,18 @@ async function handleCommand(sess, raw) {
         if (r.outcome) ncWrite(sess, `    ${col('gray','outcome:')} ${r.outcome}\r\n`);
       }
       ncWrite(sess, '> ');
+      break;
+    }
+
+    case 'hint': {
+      if (!arg) { ncWrite(sess, col('red', '[hint] Usage: hint <message>') + '\r\n> '); break; }
+      const hr = submitHint(arg);
+      if (hr.ok) {
+        broadcast({ type: 'hint', data: { text: hr.result.text, timestamp: hr.result.timestamp } });
+        ncWrite(sess, col('green', `[hint] Sent: "${hr.result.text}"`) + '\r\n> ');
+      } else {
+        ncWrite(sess, col('red', `[hint] Failed: ${hr.error}`) + '\r\n> ');
+      }
       break;
     }
 
@@ -816,6 +831,22 @@ function apiGoals() {
 function apiRestarts() {
   try { return JSON.parse(fs.readFileSync(RESTARTS_FILE, 'utf8')); } catch (_) { return []; }
 }
+function apiHints() {
+  try {
+    const h = JSON.parse(fs.readFileSync(HINTS_FILE, 'utf8'));
+    return Array.isArray(h) ? h : [];
+  } catch (_) { return []; }
+}
+function submitHint(text) {
+  if (!text || !text.trim()) return { ok: false, error: 'hint text is required' };
+  const hints = apiHints();
+  const entry = { id: `hint_${Date.now()}_${Math.random().toString(36).slice(2,6)}`, text: text.trim(), timestamp: new Date().toISOString(), seen: false };
+  hints.push(entry);
+  try {
+    fs.writeFileSync(HINTS_FILE, JSON.stringify(hints, null, 2));
+    return { ok: true, result: entry };
+  } catch (e) { return { ok: false, error: e.message }; }
+}
 function apiSnapshots() {
   try { const vm = require('./versionManager'); return vm.listSnapshots(); } catch (_) { return []; }
 }
@@ -873,6 +904,16 @@ function start() {
       if (url.pathname === '/api/history')   return json(apiEpisodic(Number(url.searchParams.get('n')) || 20));
       if (url.pathname === '/api/files')     return json(apiFiles(url.searchParams.get('path') || ''));
       if (url.pathname === '/api/file')      return json(apiFileRead(url.searchParams.get('path') || ''));
+      if (url.pathname === '/api/hints')     return json(apiHints());
+      if (url.pathname === '/api/hint' && req.method === 'POST') {
+        return req.text().then(body => {
+          let text = '';
+          try { text = JSON.parse(body).text || ''; } catch (_) { text = body; }
+          const r = submitHint(text);
+          if (r.ok) broadcast({ type: 'hint', data: { text: r.result.text, timestamp: r.result.timestamp } });
+          return json(r);
+        });
+      }
       return new Response(buildHTML(), { headers: { 'Content-Type': 'text/html' } });
     },
   });

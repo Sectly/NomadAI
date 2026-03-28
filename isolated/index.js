@@ -12,7 +12,8 @@ const TOOL_REF = require('./tools/toolRef');
 
 const OPEN_DIR = path.resolve(__dirname, '../open');
 const IDENTITY_FILE = path.resolve(__dirname, '../IDENTITY.md');
-const EP_FILE = path.join(OPEN_DIR, 'memory/episodic.json');
+const EP_FILE    = path.join(OPEN_DIR, 'memory/episodic.json');
+const HINTS_FILE = path.join(OPEN_DIR, 'hints.json');
 
 const MAX_EPISODIC = 50;
 
@@ -42,6 +43,22 @@ function appendEpisodic(entry) {
 
 function loadIdentity() {
   try { return fs.readFileSync(IDENTITY_FILE, 'utf8'); } catch (_) { return '# Identity not found'; }
+}
+
+function loadPendingHints() {
+  try {
+    const hints = JSON.parse(fs.readFileSync(HINTS_FILE, 'utf8'));
+    return Array.isArray(hints) ? hints.filter(h => !h.seen) : [];
+  } catch (_) { return []; }
+}
+
+function markHintsSeen(ids) {
+  try {
+    const hints = JSON.parse(fs.readFileSync(HINTS_FILE, 'utf8'));
+    if (!Array.isArray(hints)) return;
+    for (const h of hints) { if (ids.includes(h.id)) h.seen = true; }
+    fs.writeFileSync(HINTS_FILE, JSON.stringify(hints, null, 2));
+  } catch (_) {}
 }
 
 function loadGoals() {
@@ -110,6 +127,18 @@ async function loop() {
     _pendingResult = null;
   } else {
     messages.push({ role: 'user', content: 'Continue.' });
+  }
+
+  // Inject any unseen observer hints as an optional nudge.
+  // The agent is free to act on them, ignore them, or acknowledge and move on.
+  const pendingHints = loadPendingHints();
+  if (pendingHints.length) {
+    const hintLines = pendingHints.map(h => `- "${h.text}"  (sent ${h.timestamp})`).join('\n');
+    messages.push({
+      role: 'user',
+      content: `[Observer hints — you may act on these or ignore them entirely]\n${hintLines}`,
+    });
+    markHintsSeen(pendingHints.map(h => h.id));
   }
 
   const llmResult = await llmBridge.call({ system: systemPrompt, messages });

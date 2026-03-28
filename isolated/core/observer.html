@@ -59,6 +59,14 @@
     .toolbar button{background:#1a1a1a;border:1px solid #333;color:#ccc;padding:2px 10px;cursor:pointer;font-family:monospace;font-size:11px;border-radius:2px}
     .toolbar button:hover{background:#222}
     .breadcrumb{color:#7ec8e3;font-size:11px;padding:4px 8px;border-bottom:1px solid #1a1a1a;flex-shrink:0}
+    .hint .etype{color:#f0a500}
+    /* Hint bar */
+    #hint-bar{display:flex;gap:6px;padding:6px 10px;background:#111;border-top:1px solid #222;flex-shrink:0}
+    #hint-input{flex:1;background:#1a1a1a;border:1px solid #333;color:#e0e0e0;padding:4px 8px;font-family:monospace;font-size:12px;border-radius:2px;outline:none}
+    #hint-input:focus{border-color:#7ec8e3}
+    #hint-btn{background:#1a2a1a;border:1px solid #3a5a3a;color:#a8ff78;padding:4px 14px;cursor:pointer;font-family:monospace;font-size:12px;border-radius:2px}
+    #hint-btn:hover{background:#223a22}
+    #hint-status{font-size:11px;color:#555;align-self:center;min-width:80px}
   </style>
 </head>
 <body>
@@ -73,6 +81,11 @@
     <div class="tab" data-page="goals">Goals</div>
     <div class="tab" data-page="restarts">Restarts</div>
     <div class="tab" data-page="snapshots">Snapshots</div>
+  </div>
+  <div id="hint-bar">
+    <input id="hint-input" type="text" placeholder="Send a hint to the AI… (it may or may not act on it)" maxlength="500">
+    <button id="hint-btn" onclick="sendHint()">Send hint</button>
+    <span id="hint-status"></span>
   </div>
   <div id="content">
     <!-- Live Events page -->
@@ -131,7 +144,7 @@
   const pAlerts   = document.getElementById('p-alerts');
   const statusEl  = document.getElementById('status');
   const THOUGHT_TYPES = new Set(['thought','plan','boot']);
-  const ALERT_TYPES   = new Set(['blocked_action','error','restart_request','shutdown']);
+  const ALERT_TYPES   = new Set(['blocked_action','error','restart_request','shutdown','hint']);
   function addEntry(panel, ev) {
     const el = document.createElement('div');
     el.className = 'entry ' + ev.type;
@@ -200,6 +213,7 @@
       { type: 'tool_result',data: { tool: 'ReadFile', ok: true } },
       { type: 'memory_update', data: { key: 'env.os', value: 'Linux 6.1 x86_64' } },
       { type: 'restart_request', data: { reason: 'Test restart', status: 'approved' } },
+      { type: 'hint', data: { text: 'Try building a calculator module', timestamp: '2026-03-28T10:10:00Z' } },
     ],
   };
 
@@ -253,7 +267,32 @@
   }
   connect();
 
-  const apiFetch = (path) => MOCK_MODE ? mockFetch(path) : fetch(path);
+  const apiFetch = (path, opts) => MOCK_MODE ? mockFetch(path) : fetch(path, opts);
+
+  // ── Hint bar ──
+  async function sendHint() {
+    const input  = document.getElementById('hint-input');
+    const status = document.getElementById('hint-status');
+    const text   = input.value.trim();
+    if (!text) return;
+    input.disabled = true;
+    status.textContent = 'sending…';
+    try {
+      if (MOCK_MODE) {
+        addEntry(pAlerts, { type: 'hint', data: { text, timestamp: new Date().toISOString() } });
+        status.textContent = 'sent (mock)';
+      } else {
+        const r = await fetch('/api/hint', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+        const d = await r.json();
+        status.textContent = d.ok ? 'sent' : 'error: ' + d.error;
+      }
+      input.value = '';
+    } catch(e) { status.textContent = 'error: ' + String(e); }
+    input.disabled = false;
+    input.focus();
+    setTimeout(() => { status.textContent = ''; }, 3000);
+  }
+  document.getElementById('hint-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendHint(); });
 
   // ── Files ──
   let fileNavPath = '';
