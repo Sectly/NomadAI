@@ -16,6 +16,7 @@ const EP_FILE    = path.join(OPEN_DIR, 'memory/episodic.json');
 const HINTS_FILE = path.join(OPEN_DIR, 'hints.json');
 
 const MAX_EPISODIC = 50;
+const MAX_PENDING_RESULT = 2000;
 
 // Start observer servers (explicit — not on require)
 observerServer.start();
@@ -99,6 +100,7 @@ async function boot() {
 // Full-fidelity result from the previous turn — replaces the last truncated history
 // feedback so the LLM always sees the complete output of its most recent action.
 let _pendingResult = null;
+let _consecutiveMalformed = 0;
 
 async function loop() {
   const identity = loadIdentity();
@@ -147,9 +149,14 @@ async function loop() {
 
   let action;
   if (!llmResult.ok) {
+    _consecutiveMalformed++;
     console.warn('[NomadAI] LLM error:', llmResult.error);
-    action = llmResult.fallback;
+    if (llmResult.raw) console.warn('[NomadAI] Raw (first 300):', llmResult.raw.slice(0, 300));
+    action = { ...llmResult.fallback };
+    // Exponential backoff for repeated parse failures, capped at 30s
+    action.args = { ms: Math.min(5000 * _consecutiveMalformed, 30000) };
   } else {
+    _consecutiveMalformed = 0;
     action = llmResult.result;
   }
 
@@ -162,10 +169,19 @@ async function loop() {
 
   const result = await dispatcher.dispatch(action.tool, action.args);
 
-  // Persist full-fidelity result for the next loop iteration
+  // Persist full-fidelity result for the next loop iteration, capped to avoid
+  // overwhelming the model's context window with large tool outputs (e.g. WebSearch).
   _pendingResult = { ok: result.ok };
-  if (result.error)                _pendingResult.error  = result.error;
-  if (result.result !== undefined) _pendingResult.result = result.result;
+  if (result.error) _pendingResult.error = result.error;
+  if (result.result !== undefined) {
+    const raw = typeof result.result === 'string' ? result.result : JSON.stringify(result.result);
+    if (raw.length > MAX_PENDING_RESULT) {
+      _pendingResult.result = raw.slice(0, MAX_PENDING_RESULT) + '…';
+      _pendingResult.truncated = true;
+    } else {
+      _pendingResult.result = result.result;
+    }
+  }
 
   console.log(`[result]  ok=${result.ok}`, result.error || '');
 
