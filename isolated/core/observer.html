@@ -300,47 +300,7 @@
                 color: #7ec8e3;
             }
             /* Hint bar */
-            #hint-bar {
-                display: flex;
-                gap: 6px;
-                padding: 6px 10px;
-                background: #111;
-                border-top: 1px solid #222;
-                flex-shrink: 0;
-            }
-            #hint-input {
-                flex: 1;
-                background: #1a1a1a;
-                border: 1px solid #333;
-                color: #e0e0e0;
-                padding: 4px 8px;
-                font-family: monospace;
-                font-size: 12px;
-                border-radius: 2px;
-                outline: none;
-            }
-            #hint-input:focus {
-                border-color: #7ec8e3;
-            }
-            #hint-btn {
-                background: #1a2a1a;
-                border: 1px solid #3a5a3a;
-                color: #a8ff78;
-                padding: 4px 14px;
-                cursor: pointer;
-                font-family: monospace;
-                font-size: 12px;
-                border-radius: 2px;
-            }
-            #hint-btn:hover {
-                background: #223a22;
-            }
-            #hint-status {
-                font-size: 11px;
-                color: #555;
-                align-self: center;
-                min-width: 80px;
-            }
+
             /* Chat page */
             .chat-page {
                 flex-direction: column !important;
@@ -489,16 +449,7 @@
             <div class="tab" data-page="restarts">Restarts</div>
             <div class="tab" data-page="snapshots">Snapshots</div>
         </div>
-        <div id="hint-bar">
-            <input
-                id="hint-input"
-                type="text"
-                placeholder="Send a hint to the AI… (it may or may not act on it)"
-                maxlength="500"
-            />
-            <button id="hint-btn" onclick="sendHint()">Send hint</button>
-            <span id="hint-status"></span>
-        </div>
+
         <div id="content">
             <!-- Live Events page -->
             <div class="page active" id="page-live">
@@ -618,11 +569,6 @@
                 "error",
                 "restart_request",
                 "shutdown",
-                "hint",
-                "hint_request",
-                "hint_response",
-                "hint_wait",
-                "hint_wait_done",
             ]);
             const CHAT_TYPES = new Set([
                 "hint",
@@ -927,47 +873,6 @@
             const apiFetch = (path, opts) =>
                 MOCK_MODE ? mockFetch(path) : fetch(path, opts);
 
-            // ── Hint bar ──
-            async function sendHint() {
-                const input = document.getElementById("hint-input");
-                const status = document.getElementById("hint-status");
-                const text = input.value.trim();
-                if (!text) return;
-                input.disabled = true;
-                status.textContent = "sending…";
-                try {
-                    if (MOCK_MODE) {
-                        addEntry(pAlerts, {
-                            type: "hint",
-                            data: { text, timestamp: new Date().toISOString() },
-                        });
-                        status.textContent = "sent (mock)";
-                    } else {
-                        const r = await fetch("/api/hint", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ text }),
-                        });
-                        const d = await r.json();
-                        status.textContent = d.ok
-                            ? "sent"
-                            : "error: " + d.error;
-                    }
-                    input.value = "";
-                } catch (e) {
-                    status.textContent = "error: " + String(e);
-                }
-                input.disabled = false;
-                input.focus();
-                setTimeout(() => {
-                    status.textContent = "";
-                }, 3000);
-            }
-            document
-                .getElementById("hint-input")
-                .addEventListener("keydown", (e) => {
-                    if (e.key === "Enter") sendHint();
-                });
 
             // ── Chat ──
             const chatMessages = document.getElementById("chat-messages");
