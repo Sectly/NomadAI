@@ -17,6 +17,7 @@ Cron({id,schedule,command}) — schedule is a duration string: "30s", "5m", "2h"
 
 ### Modules
 TryLoadModule({path}) TryUnloadModule({name}) ReloadModule({name}) TestModule({path}) ListModules({})
+CallModule({name,fn,args?}) — call an exported function on a loaded module. name=module filename without .js, fn=function name, args=plain object passed as first argument.
 Paths must be in /open/modules/.
 
 ### Memory

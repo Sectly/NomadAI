@@ -93,6 +93,32 @@ try {
   }
 }
 
+async function CallModule({ name, fn, args = {} }) {
+  if (!name || typeof name !== 'string') return { ok: false, error: 'name is required' };
+  if (!fn   || typeof fn   !== 'string') return { ok: false, error: 'fn is required' };
+
+  if (!loadedModules.has(name)) return { ok: false, error: `Module not loaded: ${name}` };
+
+  const { mod } = loadedModules.get(name);
+
+  if (!mod || typeof mod[fn] !== 'function') {
+    const exported = mod ? Object.keys(mod).filter(k => typeof mod[k] === 'function').join(', ') : '(none)';
+    return { ok: false, error: `Function "${fn}" not found in module "${name}". Exported functions: ${exported || '(none)'}` };
+  }
+
+  // args must be a plain object — reject anything that could smuggle in dangerous values
+  if (typeof args !== 'object' || Array.isArray(args) || args === null) {
+    return { ok: false, error: 'args must be a plain object' };
+  }
+
+  try {
+    const result = await Promise.resolve(mod[fn](args));
+    return { ok: true, result: result ?? null };
+  } catch (e) {
+    return { ok: false, error: `${name}.${fn} threw: ${e.message}` };
+  }
+}
+
 async function ListModules() {
   const result = [];
   for (const [name, info] of loadedModules.entries()) {
@@ -101,4 +127,4 @@ async function ListModules() {
   return { ok: true, result };
 }
 
-module.exports = { TryLoadModule, TryUnloadModule, ReloadModule, TestModule, ListModules };
+module.exports = { TryLoadModule, TryUnloadModule, ReloadModule, TestModule, ListModules, CallModule };

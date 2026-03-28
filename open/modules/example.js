@@ -7,21 +7,56 @@
  *   - All top-level code must be safe to run on require() — no blocking I/O,
  *     no process.exit(), no infinite loops
  *   - Prefer built-in Node/Bun modules over npm packages
+ *   - Exported functions receive a single plain-object argument and should
+ *     return a value (or a Promise). Errors should be caught internally.
  *
- * Workflow to create a new module:
- *   1. Snapshot({})                          — save current state
- *   2. WriteFile({ path, content })          — write the module
- *   3. TestModule({ path })                  — verify it loads cleanly
- *   4. If ok=false → Rollback({})            — revert immediately
- *   5. If ok=true  → TryLoadModule({ path }) — activate it
- *   6. CommitNote({ snapshotId, message })   — describe what changed and why
+ * ── Full workflow to create and use a module ─────────────────────────────────
+ *
+ *  1. Snapshot({})
+ *       Save current state before making changes.
+ *
+ *  2. WriteFile({ path: "/open/modules/mymodule.js", content: "..." })
+ *       Write your module code.
+ *
+ *  3. TestModule({ path: "/open/modules/mymodule.js" })
+ *       Verify it loads without errors in an isolated subprocess.
+ *       If ok=false → Rollback({}) immediately, then fix and retry.
+ *
+ *  4. TryLoadModule({ path: "/open/modules/mymodule.js" })
+ *       Load the module into the running agent. The module's top-level
+ *       code runs now. Exports become callable via CallModule.
+ *
+ *  5. CallModule({ name: "mymodule", fn: "myFunction", args: { key: "value" } })
+ *       Call an exported function by name. `name` is the filename without .js.
+ *       `args` is a plain object passed as the first argument to the function.
+ *       Returns: { ok: boolean, result: any, error?: string }
+ *
+ *       Examples using this file:
+ *         CallModule({ name: "example", fn: "ping", args: {} })
+ *         CallModule({ name: "example", fn: "sysinfo", args: {} })
+ *
+ *  6. CommitNote({ snapshotId: "<id>", message: "what changed and why" })
+ *       Annotate the snapshot you took in step 1.
+ *
+ *  7. ListModules({})
+ *       See all currently loaded modules.
+ *
+ *  8. TryUnloadModule({ name: "mymodule" })
+ *       Unload when no longer needed.
+ *
+ * ── Notes ────────────────────────────────────────────────────────────────────
+ *
+ *  - CallModule passes args as the first argument: fn(args)
+ *    Design your functions to accept a single object and destructure from it.
+ *  - Modules run inside the main agent process. A crash in a module function
+ *    is caught by CallModule and returned as ok=false, but side effects
+ *    (setInterval, event listeners) run unguarded — clean them up on unload.
+ *  - Only modules in /open/modules/ can be loaded.
  */
 
 'use strict';
 
-// Built-in modules only — no npm required
-const os   = require('os');
-const path = require('path');
+const os = require('os');
 
 const meta = {
   name: 'example',
@@ -29,16 +64,15 @@ const meta = {
   description: 'Template demonstrating correct module structure. Safe to load/unload.',
 };
 
-// Module-level state — persists across calls within a session
 let callCount = 0;
 
-// Synchronous utility — always wrap in try/catch when calling from outside
+// Called via: CallModule({ name: "example", fn: "ping", args: {} })
 function ping() {
   callCount += 1;
   return { pong: true, callCount, uptime: process.uptime() };
 }
 
-// Async utility — safe pattern for file or network work
+// Called via: CallModule({ name: "example", fn: "sysinfo", args: {} })
 async function sysinfo() {
   try {
     return {
