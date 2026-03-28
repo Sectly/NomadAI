@@ -11,6 +11,7 @@ function resolvePath(p) {
 }
 
 async function TryLoadModule({ path: p }) {
+  if (!p) return { ok: false, error: 'path is required' };
   // Only allow loading from open/modules/ — no escaping to core or system paths
   if (!p.startsWith('/open/modules/')) {
     return { ok: false, error: 'TryLoadModule is restricted to /open/modules/' };
@@ -52,6 +53,7 @@ async function ReloadModule({ name }) {
 // Spawn a fresh Bun subprocess to test the module in isolation.
 // Avoids Bun Worker segfault bugs and stdout capture issues.
 async function TestModule({ path: p }) {
+  if (!p) return { ok: false, error: 'path is required' };
   const real = resolvePath(p);
 
   const harness = `

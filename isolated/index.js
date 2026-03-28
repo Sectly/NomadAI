@@ -112,7 +112,7 @@ async function loop() {
   for (const entry of history) {
     messages.push({
       role: 'assistant',
-      content: JSON.stringify({ thought: '...', plan: '...', tool: entry.tool, args: entry.args }),
+      content: JSON.stringify({ tool: entry.tool, args: entry.args }),
     });
     const feedback = { ok: entry.ok };
     if (entry.error)                feedback.error  = entry.error;

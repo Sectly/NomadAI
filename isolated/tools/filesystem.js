@@ -24,6 +24,7 @@ function isAllowedWrite(p) {
 }
 
 async function ReadFile({ path: p, offset, limit }) {
+  if (!p) return { ok: false, error: 'path is required' };
   if (!isAllowedRead(p)) return { ok: false, error: `Read blocked: ${p}` };
   const real = resolvePath(p);
   try {
@@ -41,6 +42,7 @@ async function ReadFile({ path: p, offset, limit }) {
 }
 
 async function AppendFile({ path: p, content }) {
+  if (!p) return { ok: false, error: 'path is required' };
   if (!isAllowedWrite(p)) return { ok: false, error: `Write blocked: ${p}` };
   const check = safety.validateWritePath(p);
   if (!check.safe) return { ok: false, error: check.reason };
@@ -55,6 +57,7 @@ async function AppendFile({ path: p, content }) {
 }
 
 async function WriteFile({ path: p, content }) {
+  if (!p) return { ok: false, error: 'path is required' };
   if (!isAllowedWrite(p)) return { ok: false, error: `Write blocked: ${p}` };
   const check = safety.validateWritePath(p);
   if (!check.safe) return { ok: false, error: check.reason };
@@ -69,6 +72,7 @@ async function WriteFile({ path: p, content }) {
 }
 
 async function DeleteFile({ path: p }) {
+  if (!p) return { ok: false, error: 'path is required' };
   if (!isAllowedWrite(p)) return { ok: false, error: `Delete blocked: ${p}` };
   const real = resolvePath(p);
   try {
@@ -80,6 +84,7 @@ async function DeleteFile({ path: p }) {
 }
 
 async function MoveFile({ from, to }) {
+  if (!from || !to) return { ok: false, error: 'from and to are required' };
   if (!isAllowedWrite(from) || !isAllowedWrite(to)) return { ok: false, error: 'Both paths must be in /open/' };
   try {
     fs.renameSync(resolvePath(from), resolvePath(to));
@@ -90,6 +95,7 @@ async function MoveFile({ from, to }) {
 }
 
 async function CopyFile({ from, to }) {
+  if (!from || !to) return { ok: false, error: 'from and to are required' };
   if (!isAllowedRead(from)) return { ok: false, error: `Read blocked: ${from}` };
   if (!isAllowedWrite(to))  return { ok: false, error: 'Destination must be in /open/' };
   try {
@@ -101,6 +107,7 @@ async function CopyFile({ from, to }) {
 }
 
 async function CheckFile({ path: p }) {
+  if (!p) return { ok: false, error: 'path is required' };
   const real = resolvePath(p);
   try {
     const stat = fs.statSync(real);
@@ -111,6 +118,7 @@ async function CheckFile({ path: p }) {
 }
 
 async function StatPath({ path: p }) {
+  if (!p) return { ok: false, error: 'path is required' };
   const real = resolvePath(p);
   try {
     const stat = fs.statSync(real);
@@ -121,6 +129,7 @@ async function StatPath({ path: p }) {
 }
 
 async function NewDir({ path: p }) {
+  if (!p) return { ok: false, error: 'path is required' };
   if (!isAllowedWrite(p)) return { ok: false, error: `NewDir blocked: ${p}` };
   try {
     fs.mkdirSync(resolvePath(p), { recursive: true });
@@ -131,6 +140,7 @@ async function NewDir({ path: p }) {
 }
 
 async function ReadDir({ path: p }) {
+  if (!p) return { ok: false, error: 'path is required' };
   const real = resolvePath(p);
   try {
     const entries = fs.readdirSync(real).map((name) => {
@@ -144,6 +154,7 @@ async function ReadDir({ path: p }) {
 }
 
 async function CheckDir({ path: p }) {
+  if (!p) return { ok: false, error: 'path is required' };
   const real = resolvePath(p);
   try {
     const entries = fs.readdirSync(real);
@@ -154,6 +165,7 @@ async function CheckDir({ path: p }) {
 }
 
 async function DeleteDir({ path: p, recursive = false }) {
+  if (!p) return { ok: false, error: 'path is required' };
   if (!isAllowedWrite(p)) return { ok: false, error: `DeleteDir blocked: ${p}` };
   try {
     fs.rmSync(resolvePath(p), { recursive });
@@ -170,6 +182,8 @@ function toVirtualPath(realAbs) {
 }
 
 async function GrepFiles({ path: p, pattern, recursive = false }) {
+  if (!p) return { ok: false, error: 'path is required' };
+  if (!pattern) return { ok: false, error: 'pattern is required' };
   const real = resolvePath(p);
   let re;
   try { re = new RegExp(pattern); } catch (e) { return { ok: false, error: `Invalid pattern: ${e.message}` }; }
@@ -202,6 +216,7 @@ async function GrepFiles({ path: p, pattern, recursive = false }) {
 }
 
 async function ListFiles({ path: p, recursive = false }) {
+  if (!p) return { ok: false, error: 'path is required' };
   const real = resolvePath(p);
   const files = [];
   function collect(dir) {
@@ -226,6 +241,7 @@ async function ListFiles({ path: p, recursive = false }) {
 }
 
 async function ListDirs({ path: p }) {
+  if (!p) return { ok: false, error: 'path is required' };
   const real = resolvePath(p);
   try {
     const entries = fs.readdirSync(real, { withFileTypes: true });
@@ -248,6 +264,7 @@ function setWatchBroadcast(fn) { _watchBroadcast = fn; }
 const _watchHandles = new Map();
 
 async function WatchPath({ path: p, eventTypes = ['change'] }) {
+  if (!p) return { ok: false, error: 'path is required' };
   if (!isAllowedRead(p)) return { ok: false, error: `WatchPath blocked: ${p}` };
   const real = resolvePath(p);
   // Close any existing watcher for this path to prevent handle leaks
