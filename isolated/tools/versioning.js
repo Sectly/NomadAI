@@ -45,4 +45,9 @@ async function RestoreFile({ path: p, snapshotId }) {
   return { ok: result.exitCode === 0, result: `Restored ${p} from ${snap.id}`, error: result.stderr || undefined };
 }
 
-module.exports = { Snapshot, Rollback, ListSnapshots, DiffSnapshot, CommitNote, RestoreFile };
+async function PruneSnapshots() {
+  versionManager.pruneSnapshots();
+  return { ok: true, result: `Snapshots pruned — keeping latest ${20}` };
+}
+
+module.exports = { Snapshot, Rollback, ListSnapshots, DiffSnapshot, CommitNote, RestoreFile, PruneSnapshots };

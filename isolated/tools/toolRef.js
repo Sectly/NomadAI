@@ -32,7 +32,7 @@ Fetch({url,method?,headers?,body?}) WebSearch({query,limit?}) HttpServer({port,h
 Note: WebSocket({url}) exists but is not supported in this environment — use HttpServer instead.
 
 ### Versioning
-Snapshot({label?}) Rollback({snapshotId?}) ListSnapshots({}) DiffSnapshot({fromId,toId?}) CommitNote({snapshotId,message}) RestoreFile({path,snapshotId?})
+Snapshot({label?}) Rollback({snapshotId?}) ListSnapshots({}) DiffSnapshot({fromId,toId?}) CommitNote({snapshotId,message}) RestoreFile({path,snapshotId?}) PruneSnapshots({})
 
 ### Observer / Meta
 Emit({type,data}) SetGoal({goal,priority?}) GetGoal({}) SetMood({mood}) Sleep({ms}) Introspect({}) SelfReport({})

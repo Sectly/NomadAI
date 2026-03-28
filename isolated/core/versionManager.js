@@ -5,6 +5,9 @@ const { exec } = require('./vmController');
 const OPEN_DIR = path.resolve(__dirname, '../../open');
 const SNAPSHOTS_DIR = path.join(OPEN_DIR, 'snapshots');
 
+// Maximum number of snapshots to retain. Oldest are pruned automatically.
+const MAX_SNAPSHOTS = 20;
+
 function ensureSnapshotsDir() {
   if (!fs.existsSync(SNAPSHOTS_DIR)) {
     fs.mkdirSync(SNAPSHOTS_DIR, { recursive: true });
@@ -27,7 +30,21 @@ async function snapshot(label = '') {
 
   const meta = { id, label, timestamp: new Date().toISOString(), note: '' };
   fs.writeFileSync(metaPath(id), JSON.stringify(meta, null, 2));
+
+  // Prune oldest snapshots beyond MAX_SNAPSHOTS
+  pruneSnapshots();
+
   return { ok: true, result: meta };
+}
+
+function pruneSnapshots() {
+  const snapshots = listSnapshots(); // sorted oldest → newest
+  const excess = snapshots.length - MAX_SNAPSHOTS;
+  for (let i = 0; i < excess; i++) {
+    const old = snapshots[i];
+    try { fs.unlinkSync(path.join(SNAPSHOTS_DIR, `${old.id}.tar.gz`)); } catch (_) {}
+    try { fs.unlinkSync(metaPath(old.id)); } catch (_) {}
+  }
 }
 
 async function rollback(snapshotId) {
@@ -96,4 +113,4 @@ function commitNote(snapshotId, message) {
   return { ok: true, result: meta };
 }
 
-module.exports = { snapshot, rollback, listSnapshots, diff, commitNote };
+module.exports = { snapshot, rollback, listSnapshots, diff, commitNote, pruneSnapshots };

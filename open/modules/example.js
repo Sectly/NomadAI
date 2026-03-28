@@ -1,34 +1,56 @@
 /**
  * Example NomadAI module — open/modules/example.js
  *
- * This file shows the structure every module must follow:
- *   - CommonJS exports (module.exports)
- *   - A metadata object describing what the module does
- *   - One or more exported functions the agent can call directly
+ * Every module must follow this structure:
+ *   - CommonJS (require / module.exports) — no ES module syntax
+ *   - A `meta` object describing name, version, description
+ *   - All top-level code must be safe to run on require() — no blocking I/O,
+ *     no process.exit(), no infinite loops
+ *   - Prefer built-in Node/Bun modules over npm packages
  *
- * Load this module with:
- *   TryLoadModule({ path: "/open/modules/example.js" })
- *
- * Always call TestModule first and Snapshot before writing a new module.
+ * Workflow to create a new module:
+ *   1. Snapshot({})                          — save current state
+ *   2. WriteFile({ path, content })          — write the module
+ *   3. TestModule({ path })                  — verify it loads cleanly
+ *   4. If ok=false → Rollback({})            — revert immediately
+ *   5. If ok=true  → TryLoadModule({ path }) — activate it
+ *   6. CommitNote({ snapshotId, message })   — describe what changed and why
  */
+
+'use strict';
+
+// Built-in modules only — no npm required
+const os   = require('os');
+const path = require('path');
 
 const meta = {
   name: 'example',
   version: '1.0.0',
-  description: 'Demonstrates the module structure. Safe to load and unload.',
+  description: 'Template demonstrating correct module structure. Safe to load/unload.',
 };
 
-// A simple utility the agent could call after loading this module
-function greet(name = 'world') {
-  return `Hello, ${name}! Module loaded at ${new Date().toISOString()}`;
-}
-
-// Modules can maintain internal state across calls within a session
+// Module-level state — persists across calls within a session
 let callCount = 0;
 
+// Synchronous utility — always wrap in try/catch when calling from outside
 function ping() {
   callCount += 1;
-  return { pong: true, callCount };
+  return { pong: true, callCount, uptime: process.uptime() };
 }
 
-module.exports = { meta, greet, ping };
+// Async utility — safe pattern for file or network work
+async function sysinfo() {
+  try {
+    return {
+      ok: true,
+      hostname: os.hostname(),
+      platform: os.platform(),
+      arch: os.arch(),
+      freemem: os.freemem(),
+    };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+module.exports = { meta, ping, sysinfo };

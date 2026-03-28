@@ -435,8 +435,8 @@ function startNcServer() {
 
         if (!check.allowed) {
           const secs = Math.ceil(check.retryAfterMs / 1000);
-          socket.write(`Blocked. Too many failed attempts — try again in ${secs}s.\r\n`);
-          socket.end();
+          try { socket.write(`Blocked. Too many failed attempts — try again in ${secs}s.\r\n`); } catch (_) {}
+          try { socket.end(); } catch (_) {}
           return;
         }
 
@@ -451,13 +451,13 @@ function startNcServer() {
           inputUser: '',
           authTimer: setTimeout(() => {
             if (!sess.authed) {
-              socket.write('Authentication timeout.\r\n');
-              socket.end();
+              try { socket.write('Authentication timeout.\r\n'); } catch (_) {}
+              try { socket.end(); } catch (_) {}
             }
           }, AUTH_TIMEOUT_MS),
         };
         ncSessions.set(socket, sess);
-        socket.write('Username: ');
+        try { socket.write('Username: '); } catch (_) {}
       },
 
       data(socket, chunk) {
@@ -511,6 +511,7 @@ const HTML = `<!DOCTYPE html>
     .thought .type { color: #7ec8e3; }
     .tool_call .type { color: #a8ff78; }
     .blocked_action .type { color: #ff5e5e; }
+    .error .type { color: #ff5e5e; font-weight: bold; }
     .memory_update .type { color: #c792ea; }
     #status { position: fixed; top: 8px; right: 12px; font-size: 11px; color: #555; }
     #status.connected { color: #a8ff78; }
@@ -527,7 +528,7 @@ const HTML = `<!DOCTYPE html>
     const memoryPanel  = document.getElementById('memory');
     const statusEl     = document.getElementById('status');
     const THOUGHT_TYPES = new Set(['thought','plan','boot']);
-    const COMMAND_TYPES = new Set(['tool_call','tool_result','blocked_action','restart_request']);
+    const COMMAND_TYPES = new Set(['tool_call','tool_result','blocked_action','restart_request','error','shutdown']);
     const MEMORY_TYPES  = new Set(['memory_update','module_load','module_unload']);
     function addEntry(panel, event) {
       const el = document.createElement('div');
