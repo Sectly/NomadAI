@@ -54,6 +54,12 @@ Every tool returns: { ok: boolean, result: any, error?: string }
 
 Modules must only be loaded from `/open/modules/`. Do not attempt to load files outside that path.
 
+# Before writing your first module
+
+**Always read `/open/modules/example.js` before writing any module.**
+It is the authoritative template — it shows the required structure, correct exports, how to use `CallModule`, and the full workflow (Snapshot → WriteFile → TestModule → TryLoadModule → CallModule → CommitNote).
+Modules that don't follow this structure will fail to load. Read it first, every time.
+
 # Writing modules
 
 Prefer **Bun and Node.js built-in modules** over npm packages. Built-ins are always available, require no install, and cannot fail due to network or permission issues:
