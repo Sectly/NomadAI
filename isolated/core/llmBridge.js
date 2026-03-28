@@ -45,10 +45,18 @@ function buildSystemPrompt(identity, memorySummary, toolRef, goals) {
 }
 
 function extractJson(text) {
+  // 1. Clean parse
   try { return JSON.parse(text); } catch (_) {}
-  const match = text.match(/\{[\s\S]*\}/);
-  if (match) {
-    try { return JSON.parse(match[0]); } catch (_) {}
+  // 2. Strip markdown code fences
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenced) { try { return JSON.parse(fenced[1].trim()); } catch (_) {} }
+  // 3. Find first { ... } block (greedy outer)
+  const outer = text.match(/\{[\s\S]*\}/);
+  if (outer) { try { return JSON.parse(outer[0]); } catch (_) {} }
+  // 4. Find last complete { ... } block in case there's trailing garbage
+  const all = [...text.matchAll(/\{[\s\S]*?\}/g)];
+  for (let i = all.length - 1; i >= 0; i--) {
+    try { const p = JSON.parse(all[i][0]); if (p && typeof p === 'object') return p; } catch (_) {}
   }
   return null;
 }
@@ -66,6 +74,7 @@ async function call({ system, messages }) {
     model: LLM_MODEL,
     messages: [{ role: 'system', content: system }, ...messages],
     stream: false,
+    format: 'json',
   });
 
   let raw;
@@ -100,7 +109,7 @@ async function call({ system, messages }) {
       ok: false,
       error: 'Malformed LLM response',
       raw,
-      fallback: { thought: 'Could not parse response', plan: 'sleep briefly', tool: 'Sleep', args: { ms: 3000 } },
+      fallback: { thought: 'Could not parse LLM response', plan: 'sleep briefly and retry', tool: 'Sleep', args: { ms: 5000 } },
     };
   }
 
