@@ -35,7 +35,8 @@ function getTokenPreset() {
   return { preset: _tokenPreset, numPredict: PRESETS[_tokenPreset], turnsLeft: _tokenTurnsLeft };
 }
 
-const REQUIRED_FIELDS = ['thought', 'plan', 'tool', 'args'];
+// Only tool+args are required for execution; thought/plan are patched in if missing
+const REQUIRED_FIELDS = ['tool', 'args'];
 
 // ── Mock responses ─────────────────────────────────────────────────────────────
 // Cycles through a realistic sequence so the full agent loop can be tested
@@ -145,6 +146,10 @@ async function call({ system, messages }) {
       fallback: { thought: 'Could not parse LLM response', plan: 'sleep briefly and retry', tool: 'Sleep', args: { ms: 5000 } },
     };
   }
+
+  // Patch missing thought/plan so the loop never breaks on a terse response
+  if (!parsed.thought) parsed.thought = '';
+  if (!parsed.plan)    parsed.plan    = '';
 
   return { ok: true, result: parsed };
 }
