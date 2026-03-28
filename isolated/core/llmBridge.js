@@ -1,7 +1,8 @@
-const LLM_URL     = process.env.LLM_URL     || 'http://localhost:11434/api/chat';
-const LLM_MODEL   = process.env.LLM_MODEL   || 'llama3';
-const LLM_MOCK    = process.env.LLM_MOCK    === 'true';
-const LLM_TIMEOUT = Number(process.env.LLM_TIMEOUT_MS) || 120000; // 2 min default
+const LLM_URL         = process.env.LLM_URL          || 'http://localhost:11434/api/chat';
+const LLM_MODEL       = process.env.LLM_MODEL        || 'llama3';
+const LLM_MOCK        = process.env.LLM_MOCK         === 'true';
+const LLM_TIMEOUT     = Number(process.env.LLM_TIMEOUT_MS) || 120000; // 2 min default
+const LLM_JSON_FORMAT = process.env.LLM_JSON_FORMAT  !== 'false'; // set to 'false' to disable
 
 // ── Token limit presets ────────────────────────────────────────────────────────
 const PRESETS = { low: 256, normal: 600, high: 1800 };
@@ -105,7 +106,7 @@ async function call({ system, messages }) {
     model: LLM_MODEL,
     messages: [{ role: 'system', content: system }, ...messages],
     stream: false,
-    format: 'json',
+    ...(LLM_JSON_FORMAT ? { format: 'json' } : {}),
     options: { num_predict: PRESETS[_tokenPreset] },
   });
 

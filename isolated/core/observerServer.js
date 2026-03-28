@@ -518,6 +518,7 @@ async function handleCommand(sess, raw) {
         col('gray','  ──────────────────────────────────────────────────────────') + '\r\n' +
         col('cyan','  cache') + '                  List cached tool results\r\n' +
         col('cyan','  cache clear') + ' [tool]     Clear cache (all, or specific tool)\r\n' +
+        col('cyan','  cache inject') + ' <tool> [args] [result]  Manually inject a cached result\r\n' +
         col('gray','  ──────────────────────────────────────────────────────────') + '\r\n' +
         col('cyan','  time') + '                   Show current time\r\n' +
         col('cyan','  date') + '                   Show current date\r\n' +
@@ -616,11 +617,21 @@ async function handleCommand(sess, raw) {
 
     case 'cache': {
       const { toolCache } = require('./toolDispatcher');
-      const sub = arg.split(' ')[0].toLowerCase();
+      const parts = arg.split(' ');
+      const sub = parts[0].toLowerCase();
       if (sub === 'clear') {
-        const target = arg.split(' ').slice(1).join(' ').trim() || undefined;
+        const target = parts.slice(1).join(' ').trim() || undefined;
         toolCache.clear(target);
         ncWrite(sess, col('green', target ? `[cache] Cleared entries for: ${target}` : '[cache] Entire cache cleared') + '\r\n> ');
+      } else if (sub === 'inject') {
+        // cache inject <ToolName> <args-json> <result-json>
+        const tool = parts[1];
+        if (!tool) { ncWrite(sess, col('red', '[cache] Usage: cache inject <Tool> [args-json] [result-json]') + '\r\n> '); break; }
+        let injArgs = {}, injResult = null;
+        try { injArgs = JSON.parse(parts[2] || '{}'); } catch (_) { injArgs = {}; }
+        try { injResult = JSON.parse(parts.slice(3).join(' ') || 'null'); } catch (_) { injResult = parts.slice(3).join(' ') || null; }
+        toolCache.set(tool, injArgs, { ok: true, result: injResult });
+        ncWrite(sess, col('green', `[cache] Injected result for ${tool}(${JSON.stringify(injArgs)})`) + '\r\n> ');
       } else {
         // list (default)
         const entries = toolCache.list();

@@ -95,6 +95,16 @@ async function boot() {
   if (lastRestart.ok && lastRestart.result) {
     console.log('[NomadAI] Last restart:', lastRestart.result);
   }
+
+  // Seed a default goal on first boot so the AI isn't aimless
+  const goals = loadGoals();
+  if (goals.length === 0) {
+    await dispatcher.dispatch('SetGoal', {
+      goal: 'Explore your environment: check OS info, disk usage, network interfaces, and read /open/ to understand your current state',
+      priority: 'normal',
+    });
+    console.log('[NomadAI] Seeded default first-boot goal');
+  }
 }
 
 // Full-fidelity result from the previous turn — replaces the last truncated history
@@ -108,7 +118,10 @@ async function loop() {
   const goals = loadGoals();
   const history = getRecentHistory(5);
 
-  const systemPrompt = llmBridge.buildSystemPrompt(identity, memorySummary, TOOL_REF, goals);
+  const tokenState = llmBridge.getTokenPreset();
+  const cacheCount = dispatcher.toolCache.size();
+  const statusLine = `\n\n[Status: Token=${tokenState.preset}(${tokenState.numPredict})${tokenState.turnsLeft ? ` resets in ${tokenState.turnsLeft} turns` : ''} | Cache=${cacheCount} entries]`;
+  const systemPrompt = llmBridge.buildSystemPrompt(identity, memorySummary, TOOL_REF, goals) + statusLine;
 
   // Build messages from recent history
   const messages = [];
@@ -199,11 +212,16 @@ async function loop() {
   // Tick tool cache — evicts stale entries
   dispatcher.toolCache.tick();
 
-  // Auto-summarise episodic memory if getting long
+  // Auto-summarise episodic memory if getting long, then trim the buffer
   let ep = [];
   try { ep = JSON.parse(fs.readFileSync(EP_FILE, 'utf8')); } catch (_) {}
   if (ep.length >= MAX_EPISODIC) {
     await dispatcher.dispatch('MemorySummarise', {});
+    // Trim episodic to last 10 entries so it doesn't re-trigger every turn
+    try {
+      const fresh = JSON.parse(fs.readFileSync(EP_FILE, 'utf8'));
+      fs.writeFileSync(EP_FILE, JSON.stringify(fresh.slice(-10), null, 2));
+    } catch (_) {}
   }
 }
 

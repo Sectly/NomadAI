@@ -59,11 +59,10 @@ async function dispatch(toolName, args, ctx) {
     }
   }
 
-  // Return cached result if available
+  // Return cached result if available — skip episodic logging to avoid noise
   const cached = toolCache.get(toolName, args);
   if (cached !== null) {
     if (observer) observer.broadcast({ type: 'tool_result', data: { tool: toolName, ok: cached.ok, cached: true } });
-    _log(toolName, args, cached, true);
     return cached;
   }
 
@@ -84,9 +83,9 @@ async function dispatch(toolName, args, ctx) {
   return result;
 }
 
-function _log(toolName, args, result, fromCache = false) {
+function _log(toolName, args, result) {
   if (!episodicAppend) return;
-  const entry = { ts: new Date().toISOString(), tool: toolName, args, ok: result.ok, ...(fromCache ? { cached: true } : {}) };
+  const entry = { ts: new Date().toISOString(), tool: toolName, args, ok: result.ok };
   if (!result.ok && result.error) entry.error = result.error;
   if (result.result !== undefined) {
     const raw = typeof result.result === 'string' ? result.result : JSON.stringify(result.result);
