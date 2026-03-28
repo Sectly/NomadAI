@@ -54,17 +54,26 @@ function loadAuth() {
 }
 
 async function verifyShadowHash(inputPass, storedHash) {
-  const parts = storedHash.split('$').filter(Boolean);
-  if (parts.length < 3) return false;
-  let saltArg;
-  if (parts[1].startsWith('rounds=')) {
-    saltArg = `${parts[1]}$${parts[2]}`;
-  } else {
-    saltArg = parts[1];
-  }
+  // Use python3 + ctypes to call the system libcrypt directly.
+  // This handles all hash algorithms including yescrypt ($y$) used on
+  // Debian 13 Trixie / Ubuntu 22.04+. openssl passwd -6 only does SHA-512
+  // and cannot verify yescrypt hashes.
+  const script = [
+    'import ctypes,os',
+    "p=os.environ.get('P','')",
+    "h=os.environ.get('H','')",
+    "done=False",
+    "for n in ['libcrypt.so.2','libcrypt.so.1']:",
+    "  try:",
+    "    lib=ctypes.CDLL(n); lib.crypt.restype=ctypes.c_char_p",
+    "    r=lib.crypt(p.encode(),h.encode()); print(r.decode() if r else ''); done=True; break",
+    "  except: pass",
+    "if not done: print('')",
+  ].join('\n');
+
   const proc = Bun.spawn(
-    ['openssl', 'passwd', '-6', '-salt', saltArg, inputPass],
-    { stdout: 'pipe', stderr: 'pipe' }
+    ['python3', '-c', script],
+    { stdout: 'pipe', stderr: 'pipe', env: { ...process.env, P: inputPass, H: storedHash } }
   );
   const output = await new Response(proc.stdout).text();
   await proc.exited;
@@ -1022,7 +1031,7 @@ const HTML = `<!DOCTYPE html>
     if (rel) {
       const up = document.createElement('div');
       up.className='item dir'; up.textContent='../';
-      const parent = rel.replace(/\/?[^/]*\/?$/,'');
+      const parent = rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '';
       up.onclick = () => loadFiles(parent);
       tree.appendChild(up);
     }
