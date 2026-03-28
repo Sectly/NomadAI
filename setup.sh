@@ -157,6 +157,14 @@ echo "[ollama] Model ready: ${LLM_MODEL}"
 # ── Project directory ownership and permissions ────────────────────────────────
 echo "[perms] Configuring directory permissions..."
 
+# Grant nomadai traversal (execute-only) on every parent directory up to / so
+# it can reach NOMAD_DIR even when the project lives inside a user's home dir.
+_dir="${NOMAD_DIR}"
+while [ "${_dir}" != "/" ]; do
+  _dir="$(dirname "${_dir}")"
+  chmod o+x "${_dir}" 2>/dev/null || true
+done
+
 # Project root: root owns everything by default
 chown root:root "${NOMAD_DIR}"
 chmod 755 "${NOMAD_DIR}"
