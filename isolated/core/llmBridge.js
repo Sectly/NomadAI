@@ -1,6 +1,7 @@
-const LLM_URL   = process.env.LLM_URL   || 'http://localhost:11434/api/chat';
-const LLM_MODEL = process.env.LLM_MODEL || 'llama3';
-const LLM_MOCK  = process.env.LLM_MOCK  === 'true';
+const LLM_URL     = process.env.LLM_URL     || 'http://localhost:11434/api/chat';
+const LLM_MODEL   = process.env.LLM_MODEL   || 'llama3';
+const LLM_MOCK    = process.env.LLM_MOCK    === 'true';
+const LLM_TIMEOUT = Number(process.env.LLM_TIMEOUT_MS) || 120000; // 2 min default
 
 const REQUIRED_FIELDS = ['thought', 'plan', 'tool', 'args'];
 
@@ -69,18 +70,27 @@ async function call({ system, messages }) {
 
   let raw;
   try {
-    const res = await fetch(LLM_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body,
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), LLM_TIMEOUT);
+    let res;
+    try {
+      res = await fetch(LLM_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
     const data = await res.json();
     raw = data?.message?.content || data?.choices?.[0]?.message?.content || '';
   } catch (err) {
+    const timedOut = err.name === 'AbortError';
     return {
       ok: false,
-      error: `LLM request failed: ${err.message}`,
-      fallback: { thought: 'LLM unreachable', plan: 'wait and retry', tool: 'Sleep', args: { ms: 5000 } },
+      error: timedOut ? `LLM request timed out after ${LLM_TIMEOUT}ms` : `LLM request failed: ${err.message}`,
+      fallback: { thought: timedOut ? 'LLM timed out' : 'LLM unreachable', plan: 'wait and retry', tool: 'Sleep', args: { ms: 5000 } },
     };
   }
 

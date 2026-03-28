@@ -141,6 +141,7 @@ async function loop() {
     markHintsSeen(pendingHints.map(h => h.id));
   }
 
+  console.log('[NomadAI] Calling LLM...');
   const llmResult = await llmBridge.call({ system: systemPrompt, messages });
 
   let action;
