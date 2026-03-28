@@ -516,7 +516,7 @@ async function handleCommand(sess, raw) {
       const absLs = relLs
         ? path.join(OPEN_DIR, relLs.replace(/^\/open\/?/, ''))
         : OPEN_DIR;
-      if (!absLs.startsWith(OPEN_DIR)) {
+      if (absLs !== OPEN_DIR && !absLs.startsWith(OPEN_DIR + '/')) {
         ncWrite(sess, col('red', '[ls] Access restricted to /open/') + '\r\n> ');
         break;
       }
@@ -545,7 +545,7 @@ async function handleCommand(sess, raw) {
       if (!arg) { ncWrite(sess, col('red', '[cat] Usage: cat <path>') + '\r\n> '); break; }
       const relCat = arg.replace(/^\/open\/?/, '');
       const absCat = path.join(OPEN_DIR, relCat);
-      if (!absCat.startsWith(OPEN_DIR)) {
+      if (!absCat.startsWith(OPEN_DIR + '/')) {
         ncWrite(sess, col('red', '[cat] Access restricted to /open/') + '\r\n> ');
         break;
       }
@@ -815,7 +815,7 @@ function apiThoughts(n = 50) {
 }
 function apiFiles(relPath = '') {
   const abs = relPath ? path.join(OPEN_DIR, relPath.replace(/^\/open\/?/, '')) : OPEN_DIR;
-  if (!abs.startsWith(OPEN_DIR)) return { error: 'Access restricted to /open/' };
+  if (abs !== OPEN_DIR && !abs.startsWith(OPEN_DIR + '/')) return { error: 'Access restricted to /open/' };
   try {
     const entries = fs.readdirSync(abs, { withFileTypes: true });
     return entries.map(e => {
@@ -828,7 +828,7 @@ function apiFiles(relPath = '') {
 function apiFileRead(relPath) {
   if (!relPath) return { error: 'path required' };
   const abs = path.join(OPEN_DIR, relPath.replace(/^\/open\/?/, ''));
-  if (!abs.startsWith(OPEN_DIR)) return { error: 'Access restricted to /open/' };
+  if (!abs.startsWith(OPEN_DIR + '/')) return { error: 'Access restricted to /open/' };
   try {
     const st = fs.statSync(abs);
     if (st.isDirectory()) return { error: 'Is a directory' };
@@ -1008,9 +1008,12 @@ const HTML = `<!DOCTYPE html>
   async function loadFiles(rel) {
     rel = rel !== undefined ? rel : fileNavPath;
     fileNavPath = rel;
-    const r = await fetch('/api/files?path='+encodeURIComponent(rel||''));
-    const data = await r.json();
     const tree = document.getElementById('file-tree');
+    let data;
+    try {
+      const r = await fetch('/api/files?path='+encodeURIComponent(rel||''));
+      data = await r.json();
+    } catch(e) { tree.innerHTML = '<div class="item" style="color:#ff5e5e">Fetch error: '+esc(String(e))+'</div>'; return; }
     tree.innerHTML = '';
     if (data.error) { tree.innerHTML = '<div class="item" style="color:#ff5e5e">'+esc(data.error)+'</div>'; return; }
     const label = '/open/' + (rel ? (rel.startsWith('/') ? rel.slice(1) : rel) : '');
@@ -1029,83 +1032,90 @@ const HTML = `<!DOCTYPE html>
       el.textContent = e.isDir ? e.name+'/' : e.name + (e.size!=null?' ('+fmtSize(e.size)+')':'');
       const entryPath = (rel ? rel.replace(/\/$/,'')+'/' : '') + e.name;
       if (e.isDir) { el.onclick = () => loadFiles(entryPath); }
-      else { el.onclick = () => loadFileContent(entryPath, e.name); }
+      else { el.onclick = () => loadFileContent(entryPath, el); }
       tree.appendChild(el);
     }
   }
   function fmtSize(b) { return b<1024?b+'b': b<1024*1024?(b/1024).toFixed(1)+'kb': (b/1024/1024).toFixed(2)+'mb'; }
-  async function loadFileContent(relPath, name) {
+  async function loadFileContent(relPath, clickedEl) {
     document.querySelectorAll('#file-tree .item').forEach(x=>x.classList.remove('sel'));
+    if (clickedEl) clickedEl.classList.add('sel');
     document.getElementById('file-path-label').textContent = '/open/' + relPath;
     const fc = document.getElementById('file-content');
     fc.textContent = 'Loading...';
-    const r = await fetch('/api/file?path='+encodeURIComponent(relPath));
-    const data = await r.json();
-    if (data.error) { fc.style.color='#ff5e5e'; fc.textContent=data.error; return; }
-    fc.style.color='#e0e0e0';
-    fc.textContent = data.content;
+    try {
+      const r = await fetch('/api/file?path='+encodeURIComponent(relPath));
+      const data = await r.json();
+      if (data.error) { fc.style.color='#ff5e5e'; fc.textContent=data.error; return; }
+      fc.style.color='#e0e0e0';
+      fc.textContent = data.content;
+    } catch(e) { fc.style.color='#ff5e5e'; fc.textContent='Fetch error: '+String(e); }
   }
 
   // ── Memory ──
   async function loadMemory() {
-    const r = await fetch('/api/memory');
-    const data = await r.json();
     const el = document.getElementById('mem-list');
-    el.innerHTML = '';
-    const keys = Object.keys(data);
-    if (!keys.length) { el.innerHTML = '<div style="color:#555">No memory entries.</div>'; return; }
-    for (const k of keys) {
-      const v = data[k];
-      const d = document.createElement('div'); d.className='data-item';
-      const tags = (v.tags||[]).length ? '<span class="meta">tags: '+esc(v.tags.join(', '))+'</span> ' : '';
-      const upd  = v.updatedAt ? '<span class="meta">'+esc(v.updatedAt)+'</span>' : '';
-      d.innerHTML = '<span class="key">'+esc(k)+'</span><br><span class="val">'+esc(JSON.stringify(v.value))+'</span><br>'+tags+upd;
-      el.appendChild(d);
-    }
+    try {
+      const data = await fetch('/api/memory').then(r=>r.json());
+      el.innerHTML = '';
+      const keys = Object.keys(data);
+      if (!keys.length) { el.innerHTML = '<div style="color:#555">No memory entries.</div>'; return; }
+      for (const k of keys) {
+        const v = data[k];
+        const d = document.createElement('div'); d.className='data-item';
+        const tags = (v.tags||[]).length ? '<span class="meta">tags: '+esc(v.tags.join(', '))+'</span> ' : '';
+        const upd  = v.updatedAt ? '<span class="meta">'+esc(v.updatedAt)+'</span>' : '';
+        d.innerHTML = '<span class="key">'+esc(k)+'</span><br><span class="val">'+esc(JSON.stringify(v.value))+'</span><br>'+tags+upd;
+        el.appendChild(d);
+      }
+    } catch(e) { el.innerHTML = '<div style="color:#ff5e5e">Error: '+esc(String(e))+'</div>'; }
   }
 
   // ── Goals ──
   async function loadGoals() {
-    const r = await fetch('/api/goals');
-    const data = await r.json();
     const el = document.getElementById('goals-list');
-    el.innerHTML = '';
-    if (!data.length) { el.innerHTML = '<div style="color:#555">No goals.</div>'; return; }
-    for (const g of data) {
-      const d = document.createElement('div'); d.className='data-item';
-      const pri = g.priority||'normal';
-      d.innerHTML = '<span class="badge '+esc(pri)+'">'+esc(pri)+'</span><span class="val">'+esc(g.goal)+'</span><br><span class="meta">'+esc(g.createdAt||'')+'</span>';
-      el.appendChild(d);
-    }
+    try {
+      const data = await fetch('/api/goals').then(r=>r.json());
+      el.innerHTML = '';
+      if (!data.length) { el.innerHTML = '<div style="color:#555">No goals.</div>'; return; }
+      for (const g of data) {
+        const d = document.createElement('div'); d.className='data-item';
+        const pri = g.priority||'normal';
+        d.innerHTML = '<span class="badge '+esc(pri)+'">'+esc(pri)+'</span><span class="val">'+esc(g.goal)+'</span><br><span class="meta">'+esc(g.createdAt||'')+'</span>';
+        el.appendChild(d);
+      }
+    } catch(e) { el.innerHTML = '<div style="color:#ff5e5e">Error: '+esc(String(e))+'</div>'; }
   }
 
   // ── Restarts ──
   async function loadRestarts() {
-    const r = await fetch('/api/restarts');
-    const data = await r.json();
     const el = document.getElementById('restarts-list');
-    el.innerHTML = '';
-    if (!data.length) { el.innerHTML = '<div style="color:#555">No restart history.</div>'; return; }
-    for (const rs of [...data].reverse()) {
-      const d = document.createElement('div'); d.className='data-item';
-      const st = rs.status||'pending';
-      d.innerHTML = '<span class="badge '+esc(st)+'">'+esc(st)+'</span><span class="meta">'+esc(rs.timestamp||'')+'</span><br><span class="val">'+esc(rs.reason||'(no reason)')+'</span>'+(rs.outcome?'<br><span class="meta">outcome: '+esc(rs.outcome)+'</span>':'');
-      el.appendChild(d);
-    }
+    try {
+      const data = await fetch('/api/restarts').then(r=>r.json());
+      el.innerHTML = '';
+      if (!data.length) { el.innerHTML = '<div style="color:#555">No restart history.</div>'; return; }
+      for (const rs of [...data].reverse()) {
+        const d = document.createElement('div'); d.className='data-item';
+        const st = rs.status||'pending';
+        d.innerHTML = '<span class="badge '+esc(st)+'">'+esc(st)+'</span><span class="meta">'+esc(rs.timestamp||'')+'</span><br><span class="val">'+esc(rs.reason||'(no reason)')+'</span>'+(rs.outcome?'<br><span class="meta">outcome: '+esc(rs.outcome)+'</span>':'');
+        el.appendChild(d);
+      }
+    } catch(e) { el.innerHTML = '<div style="color:#ff5e5e">Error: '+esc(String(e))+'</div>'; }
   }
 
   // ── Snapshots ──
   async function loadSnapshots() {
-    const r = await fetch('/api/snapshots');
-    const data = await r.json();
     const el = document.getElementById('snapshots-list');
-    el.innerHTML = '';
-    if (!data.length) { el.innerHTML = '<div style="color:#555">No snapshots.</div>'; return; }
-    for (const s of [...data].reverse()) {
-      const d = document.createElement('div'); d.className='data-item';
-      d.innerHTML = '<span class="key">'+esc(s.id)+'</span> <span class="meta">'+esc(s.timestamp||'')+'</span>'+(s.label?'<br><span class="val">'+esc(s.label)+'</span>':'')+(s.note?'<br><span class="meta">'+esc(s.note)+'</span>':'');
-      el.appendChild(d);
-    }
+    try {
+      const data = await fetch('/api/snapshots').then(r=>r.json());
+      el.innerHTML = '';
+      if (!data.length) { el.innerHTML = '<div style="color:#555">No snapshots.</div>'; return; }
+      for (const s of [...data].reverse()) {
+        const d = document.createElement('div'); d.className='data-item';
+        d.innerHTML = '<span class="key">'+esc(s.id)+'</span> <span class="meta">'+esc(s.timestamp||'')+'</span>'+(s.label?'<br><span class="val">'+esc(s.label)+'</span>':'')+(s.note?'<br><span class="meta">'+esc(s.note)+'</span>':'');
+        el.appendChild(d);
+      }
+    } catch(e) { el.innerHTML = '<div style="color:#ff5e5e">Error: '+esc(String(e))+'</div>'; }
   }
   </script>
 </body>
