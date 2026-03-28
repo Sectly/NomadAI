@@ -2,9 +2,6 @@ const path = require('path');
 const fs   = require('fs');
 const os   = require('os');
 
-// Worker: Bun implements worker_threads, so this works under both runtimes
-const { Worker } = require('worker_threads');
-
 const OPEN_DIR = path.resolve(__dirname, '../../open');
 const loadedModules = new Map();
 
@@ -41,49 +38,48 @@ async function ReloadModule({ name }) {
   return TryLoadModule({ path: real });
 }
 
-// Bun's Worker requires a real file path — write the test harness to a temp
-// file, run it, then clean up. The worker posts { ok, error? } to stdout as JSON.
+// Spawn a fresh Bun subprocess to test the module in isolation.
+// Avoids Bun Worker segfault bugs and stdout capture issues.
 async function TestModule({ path: p }) {
   const real = resolvePath(p);
 
   const harness = `
-const { workerData } = require('worker_threads');
 try {
-  require(workerData.target);
+  require(${JSON.stringify(real)});
   process.stdout.write(JSON.stringify({ ok: true }) + '\\n');
 } catch (e) {
   process.stdout.write(JSON.stringify({ ok: false, error: e.message }) + '\\n');
 }
-process.exit(0);
 `;
 
   const tmpFile = path.join(os.tmpdir(), `nomad_test_${Date.now()}_${Math.random().toString(36).slice(2)}.js`);
   fs.writeFileSync(tmpFile, harness);
 
-  return new Promise((resolve) => {
-    const worker = new Worker(tmpFile, { workerData: { target: real } });
-    let output = '';
-
-    worker.stdout?.on('data', (d) => { output += d.toString(); });
-    worker.on('exit', () => {
-      fs.unlink(tmpFile, () => {});
-      try {
-        resolve(JSON.parse(output.trim()));
-      } catch (_) {
-        resolve({ ok: false, error: 'Worker produced no output' });
-      }
-    });
-    worker.on('error', (err) => {
-      fs.unlink(tmpFile, () => {});
-      resolve({ ok: false, error: err.message });
+  try {
+    const proc = Bun.spawn([process.execPath, 'run', tmpFile], {
+      stdout: 'pipe',
+      stderr: 'pipe',
     });
 
-    setTimeout(() => {
-      worker.terminate();
-      fs.unlink(tmpFile, () => {});
-      resolve({ ok: false, error: 'TestModule timeout' });
-    }, 5000);
-  });
+    const result = await Promise.race([
+      (async () => {
+        const stdout = await new Response(proc.stdout).text();
+        await proc.exited;
+        return stdout.trim();
+      })(),
+      new Promise((resolve) => setTimeout(() => { try { proc.kill(); } catch (_) {} resolve(''); }, 5000)),
+    ]);
+
+    fs.unlink(tmpFile, () => {});
+    try {
+      return JSON.parse(result);
+    } catch (_) {
+      return { ok: false, error: 'TestModule produced no output' };
+    }
+  } catch (e) {
+    fs.unlink(tmpFile, () => {});
+    return { ok: false, error: e.message };
+  }
 }
 
 async function ListModules() {

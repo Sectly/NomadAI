@@ -11,11 +11,12 @@ const WS_TOKEN = process.env.OBSERVER_WS_TOKEN || '';
 // Falls back to OBSERVER_USER/OBSERVER_PASS env vars if the file is absent
 const AUTH_FILE = process.env.OBSERVER_AUTH_FILE || '/home/nomadai/.observer_auth';
 
-const OPEN_DIR     = path.resolve(__dirname, '../../open');
-const THOUGHTS_LOG = path.join(OPEN_DIR, 'thoughts.log');
-const GOALS_FILE   = path.join(OPEN_DIR, 'goals.json');
-const LT_FILE      = path.join(OPEN_DIR, 'memory/longTerm.json');
-const EP_FILE      = path.join(OPEN_DIR, 'memory/episodic.json');
+const OPEN_DIR      = path.resolve(__dirname, '../../open');
+const THOUGHTS_LOG  = path.join(OPEN_DIR, 'thoughts.log');
+const GOALS_FILE    = path.join(OPEN_DIR, 'goals.json');
+const LT_FILE       = path.join(OPEN_DIR, 'memory/longTerm.json');
+const EP_FILE       = path.join(OPEN_DIR, 'memory/episodic.json');
+const SNAPSHOTS_DIR = path.join(OPEN_DIR, 'snapshots');
 
 // ── Auth config ───────────────────────────────────────────────────────────────
 // Loaded once at start() — not hot-reloaded
@@ -127,6 +128,15 @@ function rateRecordSuccess(ip) {
   ratemap.delete(ip);
 }
 
+// ── Recent event buffer (replayed to new stream subscribers) ─────────────────
+const EVENT_BUFFER_SIZE = 10;
+const recentEvents = [];
+
+function bufferEvent(event) {
+  recentEvents.push(event);
+  if (recentEvents.length > EVENT_BUFFER_SIZE) recentEvents.shift();
+}
+
 // ── WebSocket clients ─────────────────────────────────────────────────────────
 const wsClients = new Set();
 
@@ -147,6 +157,8 @@ function formatEvent(event) {
 
 // ── Broadcast ─────────────────────────────────────────────────────────────────
 function broadcast(event) {
+  bufferEvent(event);
+
   const msg = JSON.stringify(event);
   for (const ws of wsClients) {
     try { ws.send(msg); } catch (_) {}
@@ -161,7 +173,7 @@ function broadcast(event) {
 }
 
 // ── NC command handler ────────────────────────────────────────────────────────
-function handleCommand(sess, raw) {
+async function handleCommand(sess, raw) {
   const line = raw.trim();
   if (!line) { sess.socket.write('> '); return; }
 
@@ -170,15 +182,25 @@ function handleCommand(sess, raw) {
 
   switch (cmd.toLowerCase()) {
 
-    case 'stream':
+    case 'stream': {
       sess.streaming = true;
       sess.filter = arg || null;
+      // Replay recent buffered events so the screen isn't blank on connect
+      const replay = arg
+        ? recentEvents.filter(e => e.type.includes(arg))
+        : recentEvents.slice();
+      if (replay.length) {
+        sess.socket.write(`[stream] --- last ${replay.length} buffered event(s) ---\r\n`);
+        for (const e of replay) sess.socket.write(formatEvent(e));
+        sess.socket.write('[stream] --- live ---\r\n');
+      }
       sess.socket.write(
         arg
           ? `[stream] Live stream started (filter: ${arg}). Type "stop" to end.\r\n`
           : `[stream] Live stream started (all events). Type "stop" to end.\r\n`
       );
       break;
+    }
 
     case 'stop':
       sess.streaming = false;
@@ -191,8 +213,12 @@ function handleCommand(sess, raw) {
       const h = Math.floor(u / 3600);
       const m = Math.floor((u % 3600) / 60);
       const s = Math.floor(u % 60);
+      let memCount = 0;
+      try { memCount = Object.keys(JSON.parse(fs.readFileSync(LT_FILE, 'utf8'))).length; } catch (_) {}
+      let snapCount = 0;
+      try { snapCount = fs.readdirSync(SNAPSHOTS_DIR).filter(f => f.endsWith('.json')).length; } catch (_) {}
       sess.socket.write(
-        `[status] uptime=${h}h${m}m${s}s  ws_clients=${wsClients.size}  nc_sessions=${ncSessions.size}\r\n> `
+        `[status] uptime=${h}h${m}m${s}s  ws=${wsClients.size}  nc=${ncSessions.size}  memory_keys=${memCount}  snapshots=${snapCount}\r\n> `
       );
       break;
     }
@@ -208,12 +234,46 @@ function handleCommand(sess, raw) {
     }
 
     case 'memory': {
-      if (!arg) { sess.socket.write('[memory] Usage: memory <key>\r\n> '); break; }
       let lt = {};
       try { lt = JSON.parse(fs.readFileSync(LT_FILE, 'utf8')); } catch (_) {}
+      if (!arg) {
+        // List all keys
+        const keys = Object.keys(lt);
+        if (!keys.length) { sess.socket.write('[memory] (empty)\r\n> '); break; }
+        for (const k of keys)
+          sess.socket.write(`[memory] ${k}  (updated: ${lt[k].updatedAt || '?'})\r\n`);
+        sess.socket.write('> ');
+        break;
+      }
       const entry = lt[arg];
       if (!entry) { sess.socket.write(`[memory] Key not found: ${arg}\r\n> `); break; }
-      sess.socket.write(`[memory] ${arg} = ${JSON.stringify(entry.value)}\r\n> `);
+      sess.socket.write(`[memory] ${arg} = ${JSON.stringify(entry.value)}  (tags: ${(entry.tags || []).join(', ') || 'none'})\r\n> `);
+      break;
+    }
+
+    case 'modules': {
+      // Read modules dir listing as a proxy — loaded state is in-process
+      let mods = [];
+      try { mods = fs.readdirSync(path.join(OPEN_DIR, 'modules')).filter(f => f.endsWith('.js') && f !== 'example.js'); } catch (_) {}
+      if (!mods.length) { sess.socket.write('[modules] (none written yet)\r\n> '); break; }
+      for (const m of mods) sess.socket.write(`[modules] ${m}\r\n`);
+      sess.socket.write('> ');
+      break;
+    }
+
+    case 'snapshot': {
+      // Trigger a snapshot via the versionManager directly
+      try {
+        const vm = require('../core/versionManager');
+        const result = await vm.snapshot('observer-manual');
+        if (result.ok) {
+          sess.socket.write(`[snapshot] Created: ${result.result.id}\r\n> `);
+        } else {
+          sess.socket.write(`[snapshot] Failed: ${result.error}\r\n> `);
+        }
+      } catch (e) {
+        sess.socket.write(`[snapshot] Error: ${e.message}\r\n> `);
+      }
       break;
     }
 
@@ -234,22 +294,43 @@ function handleCommand(sess, raw) {
       try { ep = JSON.parse(fs.readFileSync(EP_FILE, 'utf8')); } catch (_) {}
       const tail = ep.slice(-n);
       if (!tail.length) { sess.socket.write('[history] (empty)\r\n> '); break; }
-      for (const e of tail)
-        sess.socket.write(`[history] ${e.ts}  ${e.tool}  ok=${e.ok}\r\n`);
+      for (const e of tail) {
+        const argsStr = Object.keys(e.args || {}).length ? ' ' + JSON.stringify(e.args) : '';
+        sess.socket.write(`[history] ${e.ts}  ${e.tool}${argsStr}  ok=${e.ok}\r\n`);
+      }
       sess.socket.write('> ');
       break;
     }
 
+    case 'who': {
+      sess.socket.write(`[who] WebSocket clients: ${wsClients.size}\r\n`);
+      let i = 1;
+      for (const [, s] of ncSessions) {
+        const state = s.authed ? (s.streaming ? 'streaming' : 'idle') : 'authenticating';
+        sess.socket.write(`[who] NC #${i++}: ${s.remoteAddr}  [${state}]\r\n`);
+      }
+      sess.socket.write('> ');
+      break;
+    }
+
+    case 'clear':
+      sess.socket.write('\x1b[2J\x1b[H> ');
+      break;
+
     case 'help':
       sess.socket.write(
         '\r\nAvailable commands:\r\n' +
-        '  stream [filter]   Live event stream. Optional type filter (e.g. stream thought)\r\n' +
+        '  stream [filter]   Live event stream. Optional type filter (e.g. "stream thought")\r\n' +
         '  stop              Stop stream, return to prompt\r\n' +
-        '  status            Agent uptime and connection counts\r\n' +
+        '  status            Agent uptime, connections, memory and snapshot counts\r\n' +
         '  goals             Current AI goals\r\n' +
-        '  memory <key>      Read a long-term memory entry\r\n' +
+        '  memory [key]      List all memory keys, or read a specific key\r\n' +
+        '  modules           List AI-written modules in open/modules/\r\n' +
+        '  snapshot          Trigger a manual snapshot of open/\r\n' +
         '  thoughts [n]      Last n lines from thoughts.log (default 20)\r\n' +
-        '  history [n]       Last n episodic entries (default 10)\r\n' +
+        '  history [n]       Last n episodic tool calls (default 10)\r\n' +
+        '  who               Show active observer connections\r\n' +
+        '  clear             Clear the terminal screen\r\n' +
         '  quit              Disconnect\r\n\r\n> '
       );
       break;
@@ -385,7 +466,7 @@ function startNcServer() {
           const line = raw.replace(/\r/g, '').trim();
           if (!line) continue;
           if (sess.streaming && line.toLowerCase() !== 'stop') continue;
-          handleCommand(sess, line);
+          handleCommand(sess, line).catch(() => {});
         }
       },
 
@@ -401,7 +482,6 @@ function startNcServer() {
     },
   });
 
-  console.log(`Observer NC:  nc <host> ${NC_PORT}  (OS user auth, rate-limited)`);
 }
 
 // ── HTTP UI + WebSocket ───────────────────────────────────────────────────────
