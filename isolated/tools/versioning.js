@@ -29,7 +29,7 @@ async function RestoreFile({ path: p, snapshotId }) {
   if (!snap) return { ok: false, error: 'Snapshot not found' };
 
   const { exec } = require('../core/vmController');
-  const OPEN_DIR = require('path').resolve(__dirname, '../../../open');
+  const OPEN_DIR = require('path').resolve(__dirname, '../../open');
   const SNAP_DIR = require('path').join(OPEN_DIR, 'snapshots');
   const tarPath = require('path').join(SNAP_DIR, `${snap.id}.tar.gz`);
   const tmp = `/tmp/nomad_restore_${Date.now()}`;

@@ -6,7 +6,7 @@ const ALLOWED_READ = ['/open/', '/tmp/'];
 const ALLOWED_WRITE = ['/open/'];
 
 // In simulation, remap /open/ and /tmp/ to real paths
-const OPEN_DIR = path.resolve(__dirname, '../../../open');
+const OPEN_DIR = path.resolve(__dirname, '../../open');
 const TMP_DIR = require('os').tmpdir();
 
 function resolvePath(p) {

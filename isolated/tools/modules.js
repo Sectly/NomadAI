@@ -5,7 +5,7 @@ const os   = require('os');
 // Worker: Bun implements worker_threads, so this works under both runtimes
 const { Worker } = require('worker_threads');
 
-const OPEN_DIR = path.resolve(__dirname, '../../../open');
+const OPEN_DIR = path.resolve(__dirname, '../../open');
 const loadedModules = new Map();
 
 function resolvePath(p) {

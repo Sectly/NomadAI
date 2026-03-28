@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const OPEN_DIR = path.resolve(__dirname, '../../../open');
+const OPEN_DIR = path.resolve(__dirname, '../../open');
 const LT_FILE = path.join(OPEN_DIR, 'memory/longTerm.json');
 const EP_FILE = path.join(OPEN_DIR, 'memory/episodic.json');
 const THOUGHTS_FILE = path.join(OPEN_DIR, 'thoughts.log');

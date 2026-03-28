@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const OPEN_DIR = path.resolve(__dirname, '../../../open');
+const OPEN_DIR = path.resolve(__dirname, '../../open');
 const GOALS_FILE = path.join(OPEN_DIR, 'goals.json');
 
 let _broadcast = null;

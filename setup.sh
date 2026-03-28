@@ -252,15 +252,10 @@ mkdir -p \
   "${NOMAD_DIR}/open/modules" \
   "${NOMAD_DIR}/open/snapshots"
 
-for f in \
-  "${NOMAD_DIR}/open/memory/longTerm.json" \
-  "${NOMAD_DIR}/open/goals.json" \
-  "${NOMAD_DIR}/open/restarts.json"; do
-  [ -f "$f" ] || echo '{}' > "${f}"
-done
-
-[ -f "${NOMAD_DIR}/open/memory/episodic.json" ] \
-  || echo '[]' > "${NOMAD_DIR}/open/memory/episodic.json"
+[ -f "${NOMAD_DIR}/open/memory/longTerm.json" ]  || echo '{}' > "${NOMAD_DIR}/open/memory/longTerm.json"
+[ -f "${NOMAD_DIR}/open/memory/episodic.json" ] || echo '[]' > "${NOMAD_DIR}/open/memory/episodic.json"
+[ -f "${NOMAD_DIR}/open/goals.json" ]           || echo '[]' > "${NOMAD_DIR}/open/goals.json"
+[ -f "${NOMAD_DIR}/open/restarts.json" ]        || echo '[]' > "${NOMAD_DIR}/open/restarts.json"
 
 [ -f "${NOMAD_DIR}/open/thoughts.log" ] \
   || touch "${NOMAD_DIR}/open/thoughts.log"

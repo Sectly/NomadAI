@@ -6,7 +6,7 @@ const cronJobs = new Map();
 async function Execute({ command, cwd, timeout = 10000 }) {
   // cwd remapping
   if (cwd) {
-    const OPEN_DIR = require('path').resolve(__dirname, '../../../open');
+    const OPEN_DIR = require('path').resolve(__dirname, '../../open');
     if (cwd.startsWith('/open/')) cwd = require('path').join(OPEN_DIR, cwd.slice(6));
   }
   const result = await exec(cwd ? `cd "${cwd}" && ${command}` : command, timeout);
