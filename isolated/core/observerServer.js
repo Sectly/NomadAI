@@ -142,7 +142,7 @@ const wsClients = new Set();
 
 // ── NC sessions ───────────────────────────────────────────────────────────────
 const ncSessions = new Map();
-const AUTH_TIMEOUT_MS = 20_000;
+const AUTH_TIMEOUT_MS = 120_000;  // 2 minutes — generous for slow clients like Windows nc
 
 // ── Event formatting ──────────────────────────────────────────────────────────
 function formatEvent(event) {
@@ -369,6 +369,14 @@ async function handleAuthData(sess, chunk) {
     if (sess.step === 'user') {
       sess.inputUser = val;
       sess.step = 'pass';
+      // Reset the auth timer so the full timeout is available for password entry
+      clearTimeout(sess.authTimer);
+      sess.authTimer = setTimeout(() => {
+        if (!sess.authed) {
+          try { sess.socket.write('Authentication timeout.\r\n'); } catch (_) {}
+          try { sess.socket.end(); } catch (_) {}
+        }
+      }, AUTH_TIMEOUT_MS);
       ncWrite(sess,'Password: ');
 
     } else if (sess.step === 'pass') {
