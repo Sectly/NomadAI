@@ -260,6 +260,11 @@ mkdir -p \
 [ -f "${NOMAD_DIR}/open/thoughts.log" ] \
   || touch "${NOMAD_DIR}/open/thoughts.log"
 
+# Re-apply ownership after seeding — seed files are created as root above
+chown -R "${NOMAD_USER}:${NOMAD_GROUP}" "${NOMAD_DIR}/open"
+find "${NOMAD_DIR}/open" -type d -exec chmod 750 {} \;
+find "${NOMAD_DIR}/open" -type f -exec chmod 640 {} \;
+
 # ── Install project dependencies as nomadai ────────────────────────────────────
 cd "${NOMAD_DIR}"
 if [ -f package.json ]; then
