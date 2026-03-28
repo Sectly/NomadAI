@@ -995,7 +995,11 @@
                         };
                         existing.replaceWith(chatMsgEl(h));
                     } else {
+                        // Bubble not in DOM — create a standalone reply (dedup by response id)
+                        const replyDedupId = "cmsg-reply-" + ev.data.id;
+                        if (document.getElementById(replyDedupId)) return;
                         const reply = document.createElement("div");
+                        reply.id = replyDedupId;
                         reply.className = "msg ai";
                         const resp = ev.data.response ? esc(ev.data.response) : "(no response)";
                         const st = esc(ev.data.status || "read");

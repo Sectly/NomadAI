@@ -898,13 +898,15 @@ let _onHintReceived = null;
 function setHintReceivedCallback(fn) { _onHintReceived = fn; }
 function clearHintReceivedCallback()  { _onHintReceived = null; }
 
+const MAX_HINTS = 500;
 function submitHint(text) {
   if (!text || !text.trim()) return { ok: false, error: 'hint text is required' };
-  const hints = apiHints();
+  let hints = apiHints();
   const entry = { id: `hint_${Date.now()}_${Math.random().toString(36).slice(2,6)}`, text: text.trim(), timestamp: new Date().toISOString(), seen: false, status: 'pending' };
   // Notify index.js so it can cancel the 30s RequestHint wait early
   if (_onHintReceived) { try { _onHintReceived(); } catch (_) {} _onHintReceived = null; }
   hints.push(entry);
+  if (hints.length > MAX_HINTS) hints = hints.slice(-MAX_HINTS);
   try {
     fs.writeFileSync(HINTS_FILE, JSON.stringify(hints, null, 2));
     return { ok: true, result: entry };

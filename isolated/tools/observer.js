@@ -80,8 +80,9 @@ async function RequestHint({ message = '' }) {
   };
   if (_broadcast) _broadcast({ type: 'hint_request', data: entry });
   // Log to hints file so the observer can see it alongside sent hints
-  const hints = loadHints();
+  let hints = loadHints();
   hints.push({ ...entry, seen: true, status: 'request' });
+  if (hints.length > 500) hints = hints.slice(-500);
   try { saveHints(hints); } catch (_) {}
   return { ok: true, result: 'Request sent to observer. A response may or may not come.' };
 }
