@@ -132,7 +132,7 @@ async function InspectModule({ name }) {
   return { ok: true, result: { name, path: modPath, loadedAt, functions, values, meta } };
 }
 
-const CALL_TIMEOUT_MS = 30000;
+const CALL_TIMEOUT_MS = 60000;
 
 async function CallModule({ name, fn, args = {} }) {
   if (!name || typeof name !== 'string') return { ok: false, error: 'name is required' };
