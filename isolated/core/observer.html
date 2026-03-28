@@ -143,9 +143,98 @@
     if (panel.children.length > 500) panel.removeChild(panel.firstChild);
   }
   function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-  const WS_TOKEN = '__WS_TOKEN__';
+
+  // Detect mock mode: placeholders not replaced means file opened standalone
+  let WS_TOKEN, WS_PORT, MOCK_MODE = false;
+  try { WS_TOKEN = __WS_TOKEN__; WS_PORT = __WS_PORT__; }
+  catch(_) { MOCK_MODE = true; WS_TOKEN = ''; WS_PORT = 3001; }
+
+  const MOCK = {
+    memory: {
+      'env.os': { value: 'Linux 6.1 x86_64', tags: ['system'], updatedAt: '2026-03-28T10:00:00Z' },
+      'self.language': { value: 'JavaScript / Bun', tags: ['identity'], updatedAt: '2026-03-28T10:01:00Z' },
+      'goal.current': { value: 'Explore filesystem and build a utility module', tags: ['goal'], updatedAt: '2026-03-28T10:02:00Z' },
+    },
+    goals: [
+      { goal: 'Explore the /open/ filesystem and document its structure', priority: 'high', createdAt: '2026-03-28T10:00:00Z' },
+      { goal: 'Write a utility module for string formatting', priority: 'normal', createdAt: '2026-03-28T10:05:00Z' },
+    ],
+    restarts: [
+      { timestamp: '2026-03-28T09:55:00Z', reason: 'Initial boot after install', status: 'approved', outcome: 'resumed cleanly' },
+    ],
+    snapshots: [
+      { id: 'snap_1711620000', label: 'pre-module-write', timestamp: '2026-03-28T10:03:00Z', note: 'Before writing formatter.js' },
+      { id: 'snap_1711619700', label: 'boot', timestamp: '2026-03-28T09:55:00Z' },
+    ],
+    files: {
+      '': [
+        { name: 'modules', isDir: true },
+        { name: 'memory',  isDir: true },
+        { name: 'snapshots', isDir: true },
+        { name: 'thoughts.log', isDir: false, size: 2048 },
+        { name: 'goals.json',   isDir: false, size: 256  },
+        { name: 'restarts.json',isDir: false, size: 128  },
+      ],
+      'modules': [
+        { name: 'example.js', isDir: false, size: 1024 },
+      ],
+      'memory': [
+        { name: 'longTerm.json',  isDir: false, size: 512 },
+        { name: 'episodic.json',  isDir: false, size: 768 },
+      ],
+    },
+    fileContent: {
+      'thoughts.log':      '2026-03-28T10:00:00Z  Booted. Checking environment.\n2026-03-28T10:01:00Z  Reading IDENTITY.md.\n2026-03-28T10:02:00Z  Setting initial goal.',
+      'goals.json':        '[\n  {\n    "goal": "Explore the /open/ filesystem",\n    "priority": "high",\n    "createdAt": "2026-03-28T10:00:00Z"\n  }\n]',
+      'restarts.json':     '[\n  {\n    "timestamp": "2026-03-28T09:55:00Z",\n    "reason": "Initial boot",\n    "status": "approved"\n  }\n]',
+      'modules/example.js':'// Example module — read this before writing your own\nmodule.exports = { hello: () => "world" };',
+    },
+    events: [
+      { type: 'boot',       data: { timestamp: '2026-03-28T10:00:00Z' } },
+      { type: 'thought',    data: 'Checking environment and reading IDENTITY.md.' },
+      { type: 'plan',       data: 'Run OSInfo, then read example.js before writing any module.' },
+      { type: 'tool_call',  data: { tool: 'OSInfo', args: {} } },
+      { type: 'tool_result',data: { tool: 'OSInfo', ok: true, result: { distro: 'Debian 13', arch: 'x86_64' } } },
+      { type: 'thought',    data: 'Environment confirmed. Will now read example.js.' },
+      { type: 'tool_call',  data: { tool: 'ReadFile', args: { path: '/open/modules/example.js' } } },
+      { type: 'tool_result',data: { tool: 'ReadFile', ok: true } },
+      { type: 'memory_update', data: { key: 'env.os', value: 'Linux 6.1 x86_64' } },
+      { type: 'restart_request', data: { reason: 'Test restart', status: 'approved' } },
+    ],
+  };
+
+  function mockFetch(path) {
+    // avoid new URL(path, file://) which misbehaves in file:// context
+    const qi  = path.indexOf('?');
+    const p   = qi >= 0 ? path.slice(0, qi) : path;
+    const qs  = qi >= 0 ? path.slice(qi + 1) : '';
+    const params = new URLSearchParams(qs);
+    const rel = params.get('path') || '';
+    const ok  = (data) => Promise.resolve({ json: () => Promise.resolve(data) });
+    if (p === '/api/memory')    return ok(MOCK.memory);
+    if (p === '/api/goals')     return ok(MOCK.goals);
+    if (p === '/api/restarts')  return ok(MOCK.restarts);
+    if (p === '/api/snapshots') return ok(MOCK.snapshots);
+    if (p === '/api/files')     return ok(MOCK.files[rel] || []);
+    if (p === '/api/file') {
+      const content = MOCK.fileContent[rel] || '(no mock content for this file)';
+      return ok({ content });
+    }
+    return ok({});
+  }
+
   function connect() {
-    const url = 'ws://'+location.hostname+':__WS_PORT__' + (WS_TOKEN ? '?token='+encodeURIComponent(WS_TOKEN) : '');
+    if (MOCK_MODE) {
+      statusEl.textContent = 'mock mode';
+      statusEl.style.color = '#f0a500';
+      MOCK.events.forEach((ev, i) => setTimeout(() => {
+        if      (THOUGHT_TYPES.has(ev.type)) addEntry(pThoughts, ev);
+        else if (ALERT_TYPES.has(ev.type))   addEntry(pAlerts, ev);
+        else                                  addEntry(pCommands, ev);
+      }, i * 120));
+      return;
+    }
+    const url = 'ws://'+location.hostname+':'+WS_PORT + (WS_TOKEN ? '?token='+encodeURIComponent(WS_TOKEN) : '');
     const ws = new WebSocket(url);
     ws.onopen  = () => { statusEl.textContent='connected'; statusEl.className='connected'; };
     ws.onclose = (e) => {
@@ -164,6 +253,8 @@
   }
   connect();
 
+  const apiFetch = (path) => MOCK_MODE ? mockFetch(path) : fetch(path);
+
   // ── Files ──
   let fileNavPath = '';
   async function loadFiles(rel) {
@@ -172,11 +263,11 @@
     const tree = document.getElementById('file-tree');
     let data;
     try {
-      const r = await fetch('/api/files?path='+encodeURIComponent(rel||''));
+      const r = await apiFetch('/api/files?path='+encodeURIComponent(rel||''));
       data = await r.json();
     } catch(e) { tree.innerHTML = '<div class="item" style="color:#ff5e5e">Fetch error: '+esc(String(e))+'</div>'; return; }
     tree.innerHTML = '';
-    if (data.error) { tree.innerHTML = '<div class="item" style="color:#ff5e5e">'+esc(data.error)+'</div>'; return; }
+    if (!Array.isArray(data)) { tree.innerHTML = '<div class="item" style="color:#ff5e5e">'+(data&&data.error?esc(data.error):'Bad response')+'</div>'; return; }
     const label = '/open/' + (rel ? (rel.startsWith('/') ? rel.slice(1) : rel) : '');
     const bc = document.createElement('div');
     bc.className='breadcrumb'; bc.textContent=label; tree.appendChild(bc);
@@ -205,7 +296,7 @@
     const fc = document.getElementById('file-content');
     fc.textContent = 'Loading...';
     try {
-      const r = await fetch('/api/file?path='+encodeURIComponent(relPath));
+      const r = await apiFetch('/api/file?path='+encodeURIComponent(relPath));
       const data = await r.json();
       if (data.error) { fc.style.color='#ff5e5e'; fc.textContent=data.error; return; }
       fc.style.color='#e0e0e0';
@@ -217,7 +308,7 @@
   async function loadMemory() {
     const el = document.getElementById('mem-list');
     try {
-      const data = await fetch('/api/memory').then(r=>r.json());
+      const data = await apiFetch('/api/memory').then(r=>r.json());
       el.innerHTML = '';
       const keys = Object.keys(data);
       if (!keys.length) { el.innerHTML = '<div style="color:#555">No memory entries.</div>'; return; }
@@ -236,7 +327,7 @@
   async function loadGoals() {
     const el = document.getElementById('goals-list');
     try {
-      const data = await fetch('/api/goals').then(r=>r.json());
+      const data = await apiFetch('/api/goals').then(r=>r.json());
       el.innerHTML = '';
       if (!data.length) { el.innerHTML = '<div style="color:#555">No goals.</div>'; return; }
       for (const g of data) {
@@ -252,7 +343,7 @@
   async function loadRestarts() {
     const el = document.getElementById('restarts-list');
     try {
-      const data = await fetch('/api/restarts').then(r=>r.json());
+      const data = await apiFetch('/api/restarts').then(r=>r.json());
       el.innerHTML = '';
       if (!data.length) { el.innerHTML = '<div style="color:#555">No restart history.</div>'; return; }
       for (const rs of [...data].reverse()) {
@@ -268,7 +359,7 @@
   async function loadSnapshots() {
     const el = document.getElementById('snapshots-list');
     try {
-      const data = await fetch('/api/snapshots').then(r=>r.json());
+      const data = await apiFetch('/api/snapshots').then(r=>r.json());
       el.innerHTML = '';
       if (!data.length) { el.innerHTML = '<div style="color:#555">No snapshots.</div>'; return; }
       for (const s of [...data].reverse()) {

@@ -849,7 +849,7 @@ function apiFileRead(relPath) {
 const HTML_TEMPLATE = fs.readFileSync(path.join(__dirname, 'observer.html'), 'utf8');
 function buildHTML() {
   return HTML_TEMPLATE
-    .replace(/__WS_TOKEN__/g, WS_TOKEN)
+    .replace(/__WS_TOKEN__/g, JSON.stringify(WS_TOKEN))
     .replace(/__WS_PORT__/g, String(WS_PORT));
 }
 
