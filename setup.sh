@@ -236,8 +236,10 @@ else
 fi
 
 # ── Ensure open/ seed files exist ─────────────────────────────────────────────
+# Run as root so we can traverse any parent path (e.g. /home/<user>/NomadAI),
+# then fix ownership so nomadai owns everything under open/.
 echo "[setup] Seeding open/ directory structure..."
-sudo -u "${NOMAD_USER}" mkdir -p \
+mkdir -p \
   "${NOMAD_DIR}/open/memory" \
   "${NOMAD_DIR}/open/modules" \
   "${NOMAD_DIR}/open/snapshots"
@@ -246,14 +248,14 @@ for f in \
   "${NOMAD_DIR}/open/memory/longTerm.json" \
   "${NOMAD_DIR}/open/goals.json" \
   "${NOMAD_DIR}/open/restarts.json"; do
-  [ -f "$f" ] || sudo -u "${NOMAD_USER}" bash -c "echo '{}' > '${f}'"
+  [ -f "$f" ] || echo '{}' > "${f}"
 done
 
 [ -f "${NOMAD_DIR}/open/memory/episodic.json" ] \
-  || sudo -u "${NOMAD_USER}" bash -c "echo '[]' > '${NOMAD_DIR}/open/memory/episodic.json'"
+  || echo '[]' > "${NOMAD_DIR}/open/memory/episodic.json"
 
 [ -f "${NOMAD_DIR}/open/thoughts.log" ] \
-  || sudo -u "${NOMAD_USER}" touch "${NOMAD_DIR}/open/thoughts.log"
+  || touch "${NOMAD_DIR}/open/thoughts.log"
 
 # ── Install project dependencies as nomadai ────────────────────────────────────
 cd "${NOMAD_DIR}"
