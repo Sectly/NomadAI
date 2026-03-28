@@ -8,7 +8,10 @@ const COOLDOWN_MS = 60000;
 
 function load() {
   if (!fs.existsSync(RESTARTS_FILE)) return [];
-  return JSON.parse(fs.readFileSync(RESTARTS_FILE, 'utf8'));
+  try {
+    const parsed = JSON.parse(fs.readFileSync(RESTARTS_FILE, 'utf8'));
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_) { return []; }
 }
 
 function save(entries) {
