@@ -141,13 +141,28 @@ async function call({ system, messages }) {
   }
 
   const parsed = extractJson(raw);
-  if (!parsed || !validate(parsed)) {
+  if (!parsed) {
     return {
       ok: false,
       error: 'Malformed LLM response',
       raw,
       fallback: { thought: 'Could not parse LLM response', plan: 'sleep briefly and retry', tool: 'Sleep', args: { ms: 5000 } },
     };
+  }
+  // Partial response: model produced thought/plan but forgot the tool — recover gracefully
+  if (!validate(parsed)) {
+    if (parsed.thought || parsed.plan) {
+      parsed.tools = [{ tool: 'Sleep', args: { ms: 1000 } }];
+      if (!parsed.thought) parsed.thought = '...';
+      if (!parsed.plan)    parsed.plan    = '...';
+    } else {
+      return {
+        ok: false,
+        error: 'Malformed LLM response',
+        raw,
+        fallback: { thought: 'Could not parse LLM response', plan: 'sleep briefly and retry', tool: 'Sleep', args: { ms: 5000 } },
+      };
+    }
   }
 
   // Normalise: single-tool shorthand → tools array for uniform handling downstream
