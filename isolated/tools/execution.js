@@ -101,7 +101,13 @@ async function Stdin({ pid, input }) {
     stdout: 'pipe',
     stderr: 'pipe',
   });
-  const exitCode = await proc.exited;
+  const exitCode = await Promise.race([
+    proc.exited,
+    new Promise((_, rej) => setTimeout(() => { try { proc.kill(); } catch (_) {} rej(new Error('Stdin timeout')); }, 5000)),
+  ]).catch((e) => { return { timedOut: true, message: e.message }; });
+  if (typeof exitCode === 'object' && exitCode?.timedOut) {
+    return { ok: false, error: exitCode.message };
+  }
   return { ok: exitCode === 0, result: exitCode === 0 ? 'sent' : 'failed' };
 }
 
