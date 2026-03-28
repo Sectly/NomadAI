@@ -42,6 +42,7 @@ Snapshot({label?}) Rollback({snapshotId?}) ListSnapshots({}) DiffSnapshot({fromI
 
 ### Observer / Meta
 Emit({type,data}) SetGoal({goal,priority?}) GetGoal({}) DeleteGoal({index}) ClearGoals({}) SetMood({mood}) Sleep({ms}) SleepUntil({iso}) Introspect({}) SelfReport({})
+RequestHint({message?}) — send a message or request to the observer (ask for help, share a thought, say something). A response may or may not come.
 ListHints({seen?}) — list observer hints (seen=false for pending only).
 HintRead({id,response?}) — acknowledge a hint without accepting/rejecting (use for casual remarks or when just noting it); response defaults to "..." if omitted.
 HintAccept({id,response?}) HintReject({id,response?}) — respond to a suggestion hint; broadcasts response to observer.

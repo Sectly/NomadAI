@@ -117,6 +117,7 @@ That said, hints are worth reading. The observer can see things you can't — ho
 - If it doesn't fit or you've already tried it, use `HintReject({id, response})` with a brief reason — the observer will see your response.
 - If the hint is more of a casual remark, a question, or just the observer talking to you rather than making a suggestion — use `HintRead({id, response})` to acknowledge it. The `response` is optional; if you leave it out it defaults to `...`. You can reply with whatever feels natural.
 - You can always call `ListHints({seen: false})` to review any hints you haven't responded to yet.
+- If you want to reach out to the observer — ask for help, share something you found, or just say something — use `RequestHint({message})`. Don't expect a reply, but one might come.
 
 Don't let hints derail you from something important you're in the middle of. Finish your current thought, then decide.
 

@@ -71,6 +71,21 @@ function updateHint(id, patch) {
   return { ok: true, result: hints[idx] };
 }
 
+async function RequestHint({ message = '' }) {
+  const entry = {
+    id: `req_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    message: message.trim() || '(no message)',
+    timestamp: new Date().toISOString(),
+    type: 'request',
+  };
+  if (_broadcast) _broadcast({ type: 'hint_request', data: entry });
+  // Log to hints file so the observer can see it alongside sent hints
+  const hints = loadHints();
+  hints.push({ ...entry, seen: true, status: 'request' });
+  try { saveHints(hints); } catch (_) {}
+  return { ok: true, result: 'Request sent to observer. A response may or may not come.' };
+}
+
 async function ListHints({ seen } = {}) {
   const hints = loadHints();
   const filtered = seen === undefined ? hints : hints.filter(h => h.seen === seen);
@@ -144,4 +159,4 @@ async function SelfReport() {
   return { ok: true, result: report };
 }
 
-module.exports = { Emit, SetGoal, GetGoal, DeleteGoal, ClearGoals, SetMood, Sleep, SleepUntil, Introspect, SelfReport, ListHints, HintRead, HintAccept, HintReject, setBroadcast };
+module.exports = { Emit, SetGoal, GetGoal, DeleteGoal, ClearGoals, SetMood, Sleep, SleepUntil, Introspect, SelfReport, RequestHint, ListHints, HintRead, HintAccept, HintReject, setBroadcast };

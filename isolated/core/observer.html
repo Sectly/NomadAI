@@ -60,6 +60,7 @@
     .toolbar button:hover{background:#222}
     .breadcrumb{color:#7ec8e3;font-size:11px;padding:4px 8px;border-bottom:1px solid #1a1a1a;flex-shrink:0}
     .hint .etype{color:#f0a500}
+    .hint_request .etype{color:#c792ea}
     /* Hint bar */
     #hint-bar{display:flex;gap:6px;padding:6px 10px;background:#111;border-top:1px solid #222;flex-shrink:0}
     #hint-input{flex:1;background:#1a1a1a;border:1px solid #333;color:#e0e0e0;padding:4px 8px;font-family:monospace;font-size:12px;border-radius:2px;outline:none}
@@ -144,7 +145,7 @@
   const pAlerts   = document.getElementById('p-alerts');
   const statusEl  = document.getElementById('status');
   const THOUGHT_TYPES = new Set(['thought','plan','boot']);
-  const ALERT_TYPES   = new Set(['blocked_action','error','restart_request','shutdown','hint']);
+  const ALERT_TYPES   = new Set(['blocked_action','error','restart_request','shutdown','hint','hint_request','hint_response']);
   function addEntry(panel, ev) {
     const el = document.createElement('div');
     el.className = 'entry ' + ev.type;
