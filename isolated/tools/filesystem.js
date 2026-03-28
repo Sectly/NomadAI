@@ -143,6 +143,12 @@ async function DeleteDir({ path: p, recursive = false }) {
   }
 }
 
+function toVirtualPath(realAbs) {
+  if (realAbs.startsWith(OPEN_DIR)) return '/open/' + realAbs.slice(OPEN_DIR.length + 1).replace(/\\/g, '/');
+  if (realAbs.startsWith(TMP_DIR))  return '/tmp/'  + realAbs.slice(TMP_DIR.length  + 1).replace(/\\/g, '/');
+  return realAbs;
+}
+
 async function ListFiles({ path: p }) {
   const real = resolvePath(p);
   try {
@@ -150,8 +156,9 @@ async function ListFiles({ path: p }) {
     const files = entries
       .filter(e => e.isFile())
       .map(e => {
-        const stat = fs.statSync(path.join(real, e.name));
-        return { name: e.name, size: stat.size, modified: stat.mtime };
+        const abs = path.join(real, e.name);
+        const stat = fs.statSync(abs);
+        return { name: e.name, path: toVirtualPath(abs), absolutePath: abs, size: stat.size, modified: stat.mtime };
       });
     return { ok: true, result: files };
   } catch (e) {
@@ -165,7 +172,10 @@ async function ListDirs({ path: p }) {
     const entries = fs.readdirSync(real, { withFileTypes: true });
     const dirs = entries
       .filter(e => e.isDirectory())
-      .map(e => ({ name: e.name }));
+      .map(e => {
+        const abs = path.join(real, e.name);
+        return { name: e.name, path: toVirtualPath(abs), absolutePath: abs };
+      });
     return { ok: true, result: dirs };
   } catch (e) {
     return { ok: false, error: e.message };
