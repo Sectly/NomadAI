@@ -89,7 +89,16 @@ async function RequestHint({ message = '' }) {
 async function ListHints({ seen } = {}) {
   const hints = loadHints();
   const filtered = seen === undefined ? hints : hints.filter(h => h.seen === seen);
-  return { ok: true, result: filtered };
+  // Surface id prominently so the model uses the correct string, not a guessed index
+  const result = filtered.map(h => ({
+    id: h.id,
+    text: h.text || h.message || '',
+    status: h.status || 'pending',
+    seen: h.seen,
+    response: h.response || null,
+    timestamp: h.timestamp,
+  }));
+  return { ok: true, result };
 }
 
 async function HintRead({ id, response } = {}) {

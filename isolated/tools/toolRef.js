@@ -54,9 +54,9 @@ ToolCacheClear({tool?}) — clear the tool cache. Pass tool name to clear only t
 SetTokenLimit({preset}) — set your response token limit: 'low' (256), 'normal' (600, default), 'high' (1800). Non-normal presets auto-reset to normal after 5 turns or on restart/rollback. Use high before writing large modules, low for quick status checks.
 GetTokenLimit({}) — return current preset, numPredict, and turnsLeft before auto-reset.
 RequestHint({message?}) — send a message or request to the observer (ask for help, share a thought, say something). A response may or may not come.
-ListHints({seen?}) — list observer hints (seen=false for pending only).
-HintRead({id,response?}) — acknowledge a hint without accepting/rejecting (use for casual remarks or when just noting it); response defaults to "..." if omitted.
-HintAccept({id,response?}) HintReject({id,response?}) — respond to a suggestion hint; broadcasts response to observer.
+ListHints({seen?}) — list observer hints; each entry has an id string. seen=false for pending only.
+HintRead({id,response?}) — acknowledge a hint; id must be the exact string from the hint (e.g. "hint_1234_abcd"), not a number.
+HintAccept({id,response?}) HintReject({id,response?}) — respond to a hint; id must be the exact string from the hint.
 `;
 
 module.exports = TOOL_REF;
