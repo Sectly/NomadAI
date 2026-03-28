@@ -34,9 +34,9 @@ See [`VM_SETUP.md`](VM_SETUP.md) for full VM creation and configuration instruct
 ## Quick start
 
 ```bash
-# Clone onto the VM
-git clone https://github.com/Sectly/NomadAI.git
-cd NomadAI
+# Clone onto the VM (use /opt to avoid home directory permission issues)
+sudo git clone https://github.com/Sectly/NomadAI.git /opt/nomadai
+cd /opt/nomadai
 
 # Install everything (Bun, Ollama, pull model, create nomadai user, set permissions)
 sudo ./setup.sh

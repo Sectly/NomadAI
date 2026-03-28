@@ -141,39 +141,27 @@ sudo netplan apply
 
 ---
 
-## 7. Copy NomadAI into the VM
+## 7. Clone NomadAI into the VM
 
-From your **host machine**, copy the project into the VM over SSH. Replace `192.168.56.101` with your VM's actual IP:
-
-```bash
-scp -r /path/to/NomadAI admin@192.168.56.101:~/NomadAI
-```
-
-Or clone from git if the project is in a repo:
+SSH into the VM and clone the project to `/opt/nomadai` — this is the standard location for third-party software on Linux and avoids file permission issues that arise when the project lives inside a user's home directory:
 
 ```bash
 ssh admin@192.168.56.101
-git clone <your-repo-url> ~/NomadAI
+sudo git clone https://github.com/Sectly/NomadAI.git /opt/nomadai
 ```
+
+> **Why `/opt/nomadai`?** The `nomadai` system user that runs the agent needs to traverse the full path to the project directory. Home directories (`/home/admin/...`) are often mode `700` or `750`, blocking access for other users. `/opt` is world-accessible by default.
 
 ---
 
 ## 8. Run setup
 
-SSH into the VM:
-
 ```bash
-ssh admin@192.168.56.101
-```
-
-Run the setup script (this installs Bun, Ollama, pulls the model, creates the `nomadai` user, sets permissions, and registers the systemd service):
-
-```bash
-cd ~/NomadAI
+cd /opt/nomadai
 sudo ./setup.sh
 ```
 
-This will take a few minutes while the LLM model downloads. `llama3` is ~4.7 GB.
+This installs Bun, Ollama, pulls the model, creates the `nomadai` user, sets permissions, and registers the systemd service. It will take a few minutes while the LLM model downloads — `llama3` is ~4.7 GB.
 
 To use a different model:
 
@@ -322,19 +310,19 @@ sudo ./stop.sh
 sudo ./stop.sh --with-ollama
 
 # Watch live logs
-sudo tail -f ~/NomadAI/logs/agent.log
+sudo tail -f /opt/nomadai/logs/agent.log
 
 # systemd status
 sudo systemctl status nomadai
 sudo journalctl -u nomadai -f
 
 # Check what the AI has written to open/
-ls ~/NomadAI/open/
-cat ~/NomadAI/open/thoughts.log
-cat ~/NomadAI/open/goals.json
+ls /opt/nomadai/open/
+cat /opt/nomadai/open/thoughts.log
+cat /opt/nomadai/open/goals.json
 
 # Check snapshots
-ls ~/NomadAI/open/snapshots/
+ls /opt/nomadai/open/snapshots/
 ```
 
 ---
@@ -401,4 +389,4 @@ sudo VBoxManage modifyvm "NomadAI" --autostart-enabled on
 
 **`nomadai` user can't write to open/**
 - Run setup again to fix permissions: `sudo ./setup.sh`
-- Or manually: `sudo chown -R nomadai:nomadai ~/NomadAI/open`
+- Or manually: `sudo chown -R nomadai:nomadai /opt/nomadai/open`
