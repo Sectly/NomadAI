@@ -142,7 +142,7 @@ const wsClients = new Set();
 
 // ── NC sessions ───────────────────────────────────────────────────────────────
 const ncSessions = new Map();
-const AUTH_TIMEOUT_MS = 120_000;  // 2 minutes — generous for slow clients like Windows nc
+const AUTH_TIMEOUT_MS = 30_000;
 
 // ── Event formatting ──────────────────────────────────────────────────────────
 function formatEvent(event) {
@@ -367,17 +367,61 @@ async function handleAuthData(sess, chunk) {
     const val = raw.replace(/\r/g, '').trim();
 
     if (sess.step === 'user') {
-      sess.inputUser = val;
-      sess.step = 'pass';
-      // Reset the auth timer so the full timeout is available for password entry
-      clearTimeout(sess.authTimer);
-      sess.authTimer = setTimeout(() => {
-        if (!sess.authed) {
-          try { sess.socket.write('Authentication timeout.\r\n'); } catch (_) {}
+      // Support "user:password" on the username line to skip the password prompt
+      const colonIdx = val.indexOf(':');
+      const hasInlinePass = colonIdx !== -1;
+      sess.inputUser = hasInlinePass ? val.slice(0, colonIdx) : val;
+      const inlinePass = hasInlinePass ? val.slice(colonIdx + 1) : null;
+
+      if (hasInlinePass) {
+        // Authenticate immediately with the inline password
+        const ip    = sess.remoteAddr;
+        const check = rateCheck(ip);
+        if (!check.allowed) {
+          const secs = Math.ceil(check.retryAfterMs / 1000);
+          ncWrite(sess, `Authentication failed. Too many attempts — try again in ${secs}s.\r\n`);
           try { sess.socket.end(); } catch (_) {}
+          return;
         }
-      }, AUTH_TIMEOUT_MS);
-      ncWrite(sess,'Password: ');
+        if (check.delayMs > 0) await new Promise(r => setTimeout(r, check.delayMs));
+
+        const ok = await checkPassword(sess.inputUser, inlinePass);
+        if (ok) {
+          rateRecordSuccess(ip);
+          sess.authed = true;
+          sess.step = 'ready';
+          sess.buf = '';
+          clearTimeout(sess.authTimer);
+          ncWrite(sess,
+            `\r\nWelcome to NomadAI Observer  [${new Date().toLocaleString()}]\r\n` +
+            'Type "help" for commands, "stream" to start live feed.\r\n\r\n> '
+          );
+        } else {
+          rateRecordFailure(ip);
+          const remaining = RATE.MAX_ATTEMPTS - getRateEntry(ip).attempts.length;
+          if (remaining > 0) {
+            ncWrite(sess, `Authentication failed. ${remaining} attempt(s) remaining.\r\nUsername: `);
+            sess.step = 'user';
+            sess.inputUser = '';
+          } else {
+            const secs = Math.ceil(RATE.BLOCK_MS / 1000);
+            ncWrite(sess, `Authentication failed. Blocked for ${secs}s.\r\n`);
+            try { sess.socket.end(); } catch (_) {}
+          }
+        }
+      } else {
+        // Normal flow — ask for password separately
+        sess.step = 'pass';
+        // Reset the auth timer so the full window is available for password entry
+        clearTimeout(sess.authTimer);
+        sess.authTimer = setTimeout(() => {
+          if (!sess.authed) {
+            try { sess.socket.write('Authentication timeout.\r\n'); } catch (_) {}
+            try { sess.socket.end(); } catch (_) {}
+          }
+        }, AUTH_TIMEOUT_MS);
+        ncWrite(sess, 'Password: ');
+      }
 
     } else if (sess.step === 'pass') {
       // Rate-limit check before doing any password work
