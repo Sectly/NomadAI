@@ -840,7 +840,7 @@ function apiHints() {
 function submitHint(text) {
   if (!text || !text.trim()) return { ok: false, error: 'hint text is required' };
   const hints = apiHints();
-  const entry = { id: `hint_${Date.now()}_${Math.random().toString(36).slice(2,6)}`, text: text.trim(), timestamp: new Date().toISOString(), seen: false };
+  const entry = { id: `hint_${Date.now()}_${Math.random().toString(36).slice(2,6)}`, text: text.trim(), timestamp: new Date().toISOString(), seen: false, status: 'pending' };
   hints.push(entry);
   try {
     fs.writeFileSync(HINTS_FILE, JSON.stringify(hints, null, 2));

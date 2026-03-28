@@ -76,6 +76,21 @@ Only reach for `InstallPackage` (npm) when a built-in genuinely cannot do the jo
 - Use MemorySummarise periodically to compact old episodic entries
 - Your episodic buffer is the last N turns. Your long-term store persists across restarts.
 
+# Use tools, not direct file writes
+
+Several core files in `/open/` are managed by dedicated tools. **Do not use WriteFile on them directly** — the tools handle locking, validation, and observer notifications properly.
+
+| File | Use instead |
+|------|-------------|
+| `goals.json` | `SetGoal`, `DeleteGoal`, `ClearGoals`, `GetGoal` |
+| `hints.json` | `ListHints`, `HintRead`, `HintAccept`, `HintReject` |
+| `restarts.json` | `OSRequestRestart`, `OSListRestarts` |
+| `thoughts.log` | `ThoughtLog`, `ThoughtHistory` |
+| `memory/longTerm.json` | `MemoryRead`, `MemoryWrite`, `MemorySearch`, `MemoryForget` |
+| `memory/episodic.json` | `History`, `MemorySummarise` |
+
+Writing to these files directly will bypass the tools and may corrupt state or miss observer broadcasts.
+
 # Restarts
 
 - You can request a VM restart with OSRequestRestart — give a clear reason

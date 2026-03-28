@@ -1,8 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const OPEN_DIR = path.resolve(__dirname, '../../open');
+const OPEN_DIR  = path.resolve(__dirname, '../../open');
 const GOALS_FILE = path.join(OPEN_DIR, 'goals.json');
+const HINTS_FILE = path.join(OPEN_DIR, 'hints.json');
 
 let _broadcast = null;
 
@@ -51,6 +52,50 @@ async function ClearGoals() {
   return { ok: true, result: 'All goals cleared' };
 }
 
+// ── Hint tools ────────────────────────────────────────────────────────────────
+function loadHints() {
+  try {
+    const h = JSON.parse(fs.readFileSync(HINTS_FILE, 'utf8'));
+    return Array.isArray(h) ? h : [];
+  } catch (_) { return []; }
+}
+function saveHints(hints) {
+  fs.writeFileSync(HINTS_FILE, JSON.stringify(hints, null, 2));
+}
+function updateHint(id, patch) {
+  const hints = loadHints();
+  const idx = hints.findIndex(h => h.id === id);
+  if (idx === -1) return { ok: false, error: `Hint not found: ${id}` };
+  Object.assign(hints[idx], patch);
+  saveHints(hints);
+  return { ok: true, result: hints[idx] };
+}
+
+async function ListHints({ seen } = {}) {
+  const hints = loadHints();
+  const filtered = seen === undefined ? hints : hints.filter(h => h.seen === seen);
+  return { ok: true, result: filtered };
+}
+
+async function HintRead({ id }) {
+  if (!id) return { ok: false, error: 'id is required' };
+  return updateHint(id, { seen: true });
+}
+
+async function HintAccept({ id, response = '' }) {
+  if (!id) return { ok: false, error: 'id is required' };
+  const r = updateHint(id, { seen: true, status: 'accepted', response, respondedAt: new Date().toISOString() });
+  if (r.ok && _broadcast) _broadcast({ type: 'hint_response', data: { id, status: 'accepted', response } });
+  return r;
+}
+
+async function HintReject({ id, response = '' }) {
+  if (!id) return { ok: false, error: 'id is required' };
+  const r = updateHint(id, { seen: true, status: 'rejected', response, respondedAt: new Date().toISOString() });
+  if (r.ok && _broadcast) _broadcast({ type: 'hint_response', data: { id, status: 'rejected', response } });
+  return r;
+}
+
 async function SetMood({ mood }) {
   if (_broadcast) _broadcast({ type: 'mood', data: { mood } });
   return { ok: true, result: mood };
@@ -93,4 +138,4 @@ async function SelfReport() {
   return { ok: true, result: report };
 }
 
-module.exports = { Emit, SetGoal, GetGoal, DeleteGoal, ClearGoals, SetMood, Sleep, SleepUntil, Introspect, SelfReport, setBroadcast };
+module.exports = { Emit, SetGoal, GetGoal, DeleteGoal, ClearGoals, SetMood, Sleep, SleepUntil, Introspect, SelfReport, ListHints, HintRead, HintAccept, HintReject, setBroadcast };
