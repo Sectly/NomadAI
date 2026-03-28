@@ -72,6 +72,28 @@
     #hint-btn{background:#1a2a1a;border:1px solid #3a5a3a;color:#a8ff78;padding:4px 14px;cursor:pointer;font-family:monospace;font-size:12px;border-radius:2px}
     #hint-btn:hover{background:#223a22}
     #hint-status{font-size:11px;color:#555;align-self:center;min-width:80px}
+    /* Chat page */
+    .chat-page{flex-direction:column!important;gap:0!important;padding:0!important}
+    #chat-messages{flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:10px}
+    .msg{display:flex;flex-direction:column;max-width:72%}
+    .msg.observer{align-self:flex-end;align-items:flex-end}
+    .msg.ai,.msg.ai-req{align-self:flex-start;align-items:flex-start}
+    .msg-bubble{padding:8px 13px;border-radius:12px;font-size:12px;line-height:1.55;word-break:break-word;white-space:pre-wrap}
+    .msg.observer .msg-bubble{background:#1a3a2a;border:1px solid #3a6a4a;color:#a8ff78}
+    .msg.ai .msg-bubble{background:#1a2a3a;border:1px solid #3a5a7a;color:#7ec8e3}
+    .msg.ai-req .msg-bubble{background:#2a1a3a;border:1px solid #5a3a7a;color:#c792ea}
+    .msg-meta{font-size:10px;color:#555;margin-top:3px}
+    .msg-status{padding:1px 6px;border-radius:3px;font-size:10px;margin-left:5px;font-style:normal}
+    .msg-status.accepted{color:#5fca7a}.msg-status.rejected{color:#ff7070}.msg-status.read{color:#7ec8e3}.msg-status.pending{color:#f0a500}
+    .msg-reply{margin-top:6px;border-left:2px solid #2a2a2a;padding-left:8px}
+    .msg-reply .msg-bubble{background:#111;border:1px solid #222;color:#aaa}
+    .hint-wait-notice{text-align:center;font-size:11px;color:#f0a500;font-style:italic;padding:4px 0}
+    .chat-input-row{display:flex;gap:6px;padding:8px 12px;background:#111;border-top:1px solid #222;flex-shrink:0}
+    #chat-input{flex:1;background:#1a1a1a;border:1px solid #333;color:#e0e0e0;padding:6px 10px;font-family:monospace;font-size:12px;border-radius:4px;outline:none}
+    #chat-input:focus{border-color:#7ec8e3}
+    #chat-send{background:#1a2a1a;border:1px solid #3a5a3a;color:#a8ff78;padding:6px 16px;cursor:pointer;font-family:monospace;font-size:12px;border-radius:4px}
+    #chat-send:hover{background:#223a22}
+    #chat-send-status{font-size:11px;color:#555;align-self:center}
   </style>
 </head>
 <body>
@@ -81,6 +103,7 @@
   </div>
   <div id="tabs">
     <div class="tab active" data-page="live">Live Events</div>
+    <div class="tab" data-page="chat">💬 Chat</div>
     <div class="tab" data-page="files">Files</div>
     <div class="tab" data-page="memory">Memory</div>
     <div class="tab" data-page="goals">Goals</div>
@@ -98,6 +121,15 @@
       <div class="panel"><h3>Thoughts &amp; Plans</h3><div class="scroll" id="p-thoughts"></div></div>
       <div class="panel"><h3>Tools &amp; Actions</h3><div class="scroll" id="p-commands"></div></div>
       <div class="panel"><h3>Errors &amp; Alerts</h3><div class="scroll" id="p-alerts"></div></div>
+    </div>
+    <!-- Chat page -->
+    <div class="page chat-page" id="page-chat">
+      <div id="chat-messages"></div>
+      <div class="chat-input-row">
+        <input id="chat-input" type="text" placeholder="Send a hint to the AI…" maxlength="500">
+        <button id="chat-send" onclick="sendChatHint()">Send</button>
+        <span id="chat-send-status"></span>
+      </div>
     </div>
     <!-- Files page -->
     <div class="page" id="page-files">
@@ -139,7 +171,7 @@
     pages.forEach(x => x.classList.remove('active'));
     t.classList.add('active');
     document.getElementById('page-' + t.dataset.page).classList.add('active');
-    const loaders = {files:loadFiles, memory:loadMemory, goals:loadGoals, restarts:loadRestarts, snapshots:loadSnapshots};
+    const loaders = {chat:loadChat, files:loadFiles, memory:loadMemory, goals:loadGoals, restarts:loadRestarts, snapshots:loadSnapshots};
     if (loaders[t.dataset.page]) loaders[t.dataset.page]();
   }));
 
@@ -149,7 +181,8 @@
   const pAlerts   = document.getElementById('p-alerts');
   const statusEl  = document.getElementById('status');
   const THOUGHT_TYPES = new Set(['thought','plan','boot']);
-  const ALERT_TYPES   = new Set(['blocked_action','error','restart_request','shutdown','hint','hint_request','hint_response']);
+  const ALERT_TYPES   = new Set(['blocked_action','error','restart_request','shutdown','hint','hint_request','hint_response','hint_wait']);
+  const CHAT_TYPES    = new Set(['hint','hint_request','hint_response','hint_wait']);
   function addEntry(panel, ev) {
     const el = document.createElement('div');
     const ts = new Date().toLocaleTimeString();
@@ -229,6 +262,12 @@
       { type: 'restart_request', data: { reason: 'Test restart', status: 'approved' } },
       { type: 'hint', data: { text: 'Try building a calculator module', timestamp: '2026-03-28T10:10:00Z' } },
     ],
+    hints: [
+      { id: 'h1', text: 'Try building a calculator module', timestamp: '2026-03-28T10:10:00Z', seen: true, status: 'accepted', response: "Good idea! I'll start with a basic arithmetic module.", respondedAt: '2026-03-28T10:10:05Z' },
+      { id: 'h2', text: 'How is the network looking?', timestamp: '2026-03-28T10:15:00Z', seen: true, status: 'read', response: 'Checking now — ran Ping and WebSearch.', respondedAt: '2026-03-28T10:15:10Z' },
+      { id: 'req1', message: 'I found something interesting in /isolated/ — the core uses Bun.serve(). Should I try to mirror that pattern?', timestamp: '2026-03-28T10:20:00Z', seen: true, status: 'request', type: 'request' },
+      { id: 'h3', text: "Yes, go ahead and try it!", timestamp: '2026-03-28T10:21:00Z', seen: false, status: 'pending' },
+    ],
   };
 
   function mockFetch(path) {
@@ -239,6 +278,7 @@
     const params = new URLSearchParams(qs);
     const rel = params.get('path') || '';
     const ok  = (data) => Promise.resolve({ json: () => Promise.resolve(data) });
+    if (p === '/api/hints')     return ok(MOCK.hints || []);
     if (p === '/api/memory')    return ok(MOCK.memory);
     if (p === '/api/goals')     return ok(MOCK.goals);
     if (p === '/api/restarts')  return ok(MOCK.restarts);
@@ -259,6 +299,7 @@
         if      (THOUGHT_TYPES.has(ev.type)) addEntry(pThoughts, ev);
         else if (ALERT_TYPES.has(ev.type))   addEntry(pAlerts, ev);
         else                                  addEntry(pCommands, ev);
+        if (CHAT_TYPES.has(ev.type)) addChatEvent(ev);
       }, i * 120));
       return;
     }
@@ -276,6 +317,7 @@
         if      (THOUGHT_TYPES.has(ev.type)) addEntry(pThoughts, ev);
         else if (ALERT_TYPES.has(ev.type))   addEntry(pAlerts, ev);
         else                                  addEntry(pCommands, ev);
+        if (CHAT_TYPES.has(ev.type)) addChatEvent(ev);
       } catch(_) {}
     };
   }
@@ -307,6 +349,106 @@
     setTimeout(() => { status.textContent = ''; }, 3000);
   }
   document.getElementById('hint-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendHint(); });
+
+  // ── Chat ──
+  const chatMessages = document.getElementById('chat-messages');
+
+  function chatMsgEl(h) {
+    const isReq = h.type === 'request' || h.status === 'request';
+    const el = document.createElement('div');
+    el.className = 'msg ' + (isReq ? 'ai-req' : 'observer');
+    el.id = 'cmsg-' + h.id;
+    const text = isReq ? (h.message || '') : (h.text || '');
+    const ts = h.timestamp ? new Date(h.timestamp).toLocaleTimeString() : '';
+    const label = isReq ? '🤖 AI' : '👤 You';
+    let statusBadge = '';
+    if (!isReq && h.status) statusBadge = ' <span class="msg-status ' + esc(h.status) + '">' + esc(h.status) + '</span>';
+    let replyHtml = '';
+    if (h.response && h.status !== 'request') {
+      const rts = h.respondedAt ? new Date(h.respondedAt).toLocaleTimeString() : '';
+      replyHtml = '<div class="msg-reply"><div class="msg msg-bubble" style="background:#111;border:1px solid #222;color:#aaa;padding:6px 10px;border-radius:8px">'+esc(h.response)+'</div><div class="msg-meta">🤖 AI · '+esc(rts)+'</div></div>';
+    }
+    el.innerHTML = '<div class="msg-bubble">'+esc(text)+'</div><div class="msg-meta">'+esc(label)+' · '+esc(ts)+statusBadge+'</div>'+replyHtml;
+    return el;
+  }
+
+  async function loadChat() {
+    chatMessages.innerHTML = '';
+    let hints = [];
+    try {
+      hints = await apiFetch('/api/hints').then(r => r.json());
+      if (!Array.isArray(hints)) hints = [];
+    } catch(_) {}
+    if (!hints.length) {
+      chatMessages.innerHTML = '<div style="color:#555;text-align:center;margin-top:20px;font-size:12px">No hints yet. Send one below.</div>';
+      return;
+    }
+    hints.sort((a, b) => (a.timestamp||'').localeCompare(b.timestamp||''));
+    for (const h of hints) chatMessages.appendChild(chatMsgEl(h));
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function addChatEvent(ev) {
+    if (ev.type === 'hint' && ev.data) {
+      // New hint sent by observer → right bubble
+      const h = { id: 'live_'+Date.now(), text: ev.data.text, timestamp: ev.data.timestamp || new Date().toISOString(), status: 'pending' };
+      chatMessages.appendChild(chatMsgEl(h));
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    } else if (ev.type === 'hint_response' && ev.data) {
+      // AI responded — try to update existing bubble, else append a left bubble
+      const existing = document.getElementById('cmsg-' + ev.data.id);
+      if (existing) {
+        const h = { id: ev.data.id, text: existing.querySelector('.msg-bubble')?.textContent || '', status: ev.data.status, response: ev.data.response, respondedAt: new Date().toISOString() };
+        existing.replaceWith(chatMsgEl(h));
+      } else {
+        const reply = document.createElement('div');
+        reply.className = 'msg ai';
+        const resp = ev.data.response ? esc(ev.data.response) : '(no response text)';
+        reply.innerHTML = '<div class="msg-bubble">'+resp+'</div><div class="msg-meta">🤖 AI · <span class="msg-status '+esc(ev.data.status||'read')+'">'+esc(ev.data.status||'read')+'</span></div>';
+        chatMessages.appendChild(reply);
+      }
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    } else if (ev.type === 'hint_request' && ev.data) {
+      // AI sent a RequestHint → left bubble
+      const h = { id: ev.data.id || 'req_'+Date.now(), message: ev.data.message || '', timestamp: new Date().toISOString(), status: 'request', type: 'request' };
+      chatMessages.appendChild(chatMsgEl(h));
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    } else if (ev.type === 'hint_wait') {
+      const notice = document.createElement('div');
+      notice.className = 'hint-wait-notice';
+      notice.textContent = '⏳ AI is waiting 30s for your response…';
+      chatMessages.appendChild(notice);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      setTimeout(() => { try { chatMessages.removeChild(notice); } catch(_) {} }, 31000);
+    }
+  }
+
+  async function sendChatHint() {
+    const input  = document.getElementById('chat-input');
+    const status = document.getElementById('chat-send-status');
+    const text   = input.value.trim();
+    if (!text) return;
+    input.disabled = true;
+    status.textContent = 'sending…';
+    try {
+      if (MOCK_MODE) {
+        addChatEvent({ type: 'hint', data: { text, timestamp: new Date().toISOString() } });
+        status.textContent = 'sent (mock)';
+      } else {
+        const r = await fetch('/api/hint', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ text }) });
+        const d = await r.json();
+        if (!d.ok) { status.textContent = 'error: ' + esc(d.error||''); input.disabled = false; return; }
+        // Optimistically add to chat (WS event will also fire but we guard by id)
+        addChatEvent({ type: 'hint', data: { id: d.result?.id, text, timestamp: new Date().toISOString() } });
+        status.textContent = 'sent';
+      }
+      input.value = '';
+    } catch(e) { status.textContent = 'error'; }
+    input.disabled = false;
+    input.focus();
+    setTimeout(() => { status.textContent = ''; }, 2000);
+  }
+  document.getElementById('chat-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendChatHint(); });
 
   // ── Files ──
   let fileNavPath = '';
