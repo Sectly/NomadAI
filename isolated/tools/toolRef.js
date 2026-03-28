@@ -6,7 +6,7 @@ All tools return: { ok: boolean, result: any, error?: string }
 
 ### Filesystem
 ReadFile({path}) WriteFile({path,content}) DeleteFile({path}) MoveFile({from,to}) CopyFile({from,to})
-CheckFile({path}) StatPath({path}) NewDir({path}) ReadDir({path}) CheckDir({path}) DeleteDir({path,recursive}) WatchPath({path,eventTypes})
+CheckFile({path}) StatPath({path}) NewDir({path}) ReadDir({path}) ListFiles({path}) ListDirs({path}) CheckDir({path}) DeleteDir({path,recursive}) WatchPath({path,eventTypes})
 ALWAYS use virtual paths: /open/... for your sector, /tmp/... for scratch.
 Never use real OS paths. Writes blocked outside /open/. Reads allowed from /open/ and /tmp/.
 

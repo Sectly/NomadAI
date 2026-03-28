@@ -143,6 +143,35 @@ async function DeleteDir({ path: p, recursive = false }) {
   }
 }
 
+async function ListFiles({ path: p }) {
+  const real = resolvePath(p);
+  try {
+    const entries = fs.readdirSync(real, { withFileTypes: true });
+    const files = entries
+      .filter(e => e.isFile())
+      .map(e => {
+        const stat = fs.statSync(path.join(real, e.name));
+        return { name: e.name, size: stat.size, modified: stat.mtime };
+      });
+    return { ok: true, result: files };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+async function ListDirs({ path: p }) {
+  const real = resolvePath(p);
+  try {
+    const entries = fs.readdirSync(real, { withFileTypes: true });
+    const dirs = entries
+      .filter(e => e.isDirectory())
+      .map(e => ({ name: e.name }));
+    return { ok: true, result: dirs };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
 // _broadcast is set by index.js after the observer is wired up
 let _watchBroadcast = null;
 function setWatchBroadcast(fn) { _watchBroadcast = fn; }
@@ -164,6 +193,6 @@ async function WatchPath({ path: p, eventTypes = ['change'] }) {
 
 module.exports = {
   ReadFile, WriteFile, DeleteFile, MoveFile, CopyFile,
-  CheckFile, StatPath, NewDir, ReadDir, CheckDir, DeleteDir, WatchPath,
+  CheckFile, StatPath, NewDir, ReadDir, ListFiles, ListDirs, CheckDir, DeleteDir, WatchPath,
   setWatchBroadcast,
 };
