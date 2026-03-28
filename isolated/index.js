@@ -103,7 +103,7 @@ async function loop() {
   const identity = loadIdentity();
   const memorySummary = loadMemorySummary();
   const goals = loadGoals();
-  const history = getRecentHistory();
+  const history = getRecentHistory(5);
 
   const systemPrompt = llmBridge.buildSystemPrompt(identity, memorySummary, TOOL_REF, goals);
 
