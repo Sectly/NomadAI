@@ -1,0 +1,41 @@
+# Local env overrides (the example file IS tracked)
+.env
+.env.local
+
+# Dependencies
+node_modules/
+
+# Logs
+logs/
+*.log
+
+# AI runtime state — these are generated at runtime, not source
+open/memory/longTerm.json
+open/memory/episodic.json
+open/thoughts.log
+open/goals.json
+open/restarts.json
+
+# Ignore contents of these dirs but keep the dirs themselves via .gitkeep
+open/snapshots/*
+open/modules/*
+
+# Keep directory structure placeholders and the example module
+!open/memory/.gitkeep
+!open/modules/.gitkeep
+!open/modules/example.js
+!open/snapshots/.gitkeep
+
+# Bun
+.bun/
+bun.lockb
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

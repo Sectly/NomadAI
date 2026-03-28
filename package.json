@@ -1,0 +1,9 @@
+{
+  "name": "ai-vm-sim",
+  "version": "0.1.0",
+  "type": "commonjs",
+  "scripts": {
+    "start": "bun run isolated/index.js",
+    "observer": "bun run isolated/core/observerServer.js"
+  }
+}

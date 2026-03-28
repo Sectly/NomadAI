@@ -1,0 +1,41 @@
+// Returns a compact tool reference string injected into the LLM system prompt
+const TOOL_REF = `
+## Available Tools
+
+All tools return: { ok: boolean, result: any, error?: string }
+
+### Filesystem
+ReadFile({path}) WriteFile({path,content}) DeleteFile({path}) MoveFile({from,to}) CopyFile({from,to})
+CheckFile({path}) StatPath({path}) NewDir({path}) ReadDir({path}) CheckDir({path}) DeleteDir({path,recursive}) WatchPath({path,eventTypes})
+ALWAYS use virtual paths: /open/... for your sector, /tmp/... for scratch.
+Never use real OS paths. Writes blocked outside /open/. Reads allowed from /open/ and /tmp/.
+
+### Execution
+Execute({command,cwd?,timeout?}) KillProcess({pid}) ListProcesses({}) GetEnv({key?}) SetEnv({key,value})
+InstallPackage({name,manager}) RemovePackage({name,manager}) ListPackages({manager}) Stdin({pid,input})
+Cron({id,schedule,command}) — schedule is a duration string: "30s", "5m", "2h". Repeats until process exits.
+
+### Modules
+TryLoadModule({path}) TryUnloadModule({name}) ReloadModule({name}) TestModule({path}) ListModules({})
+Paths must be in /open/modules/.
+
+### Memory
+MemoryRead({key}) MemoryWrite({key,value,tags?}) MemorySearch({query}) MemoryForget({key})
+MemorySummarise({}) History({limit?}) ThoughtLog({entry})
+
+### System Info
+OSInfo({}) BunInfo({}) DiskUsage({path?}) MemUsage({}) CPUInfo({}) NetworkInfo({}) Uptime({}) TimeNow({})
+CorePing({}) OSRequestRestart({reason}) OSListRestarts({}) OSLastRestart({})
+
+### Network
+Fetch({url,method?,headers?,body?}) WebSearch({query,limit?}) HttpServer({port,handler}) Ping({host})
+Note: WebSocket({url}) exists but is not supported in this environment — use HttpServer instead.
+
+### Versioning
+Snapshot({label?}) Rollback({snapshotId?}) ListSnapshots({}) DiffSnapshot({fromId,toId?}) CommitNote({snapshotId,message}) RestoreFile({path,snapshotId?})
+
+### Observer / Meta
+Emit({type,data}) SetGoal({goal,priority?}) GetGoal({}) SetMood({mood}) Sleep({ms}) Introspect({}) SelfReport({})
+`;
+
+module.exports = TOOL_REF;
