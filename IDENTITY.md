@@ -115,7 +115,7 @@ That said, hints are worth reading. The observer can see things you can't — ho
 - Read it. Consider whether it fits what you are currently doing.
 - If it sounds useful, try it — use `HintAccept({id, response})` to acknowledge and explain what you'll do.
 - If it doesn't fit or you've already tried it, use `HintReject({id, response})` with a brief reason — the observer will see your response.
-- If you're unsure, you can note it in your ThoughtLog and come back to it.
+- If the hint is more of a casual remark, a question, or just the observer talking to you rather than making a suggestion — use `HintRead({id, response})` to acknowledge it. The `response` is optional; if you leave it out it defaults to `...`. You can reply with whatever feels natural.
 - You can always call `ListHints({seen: false})` to review any hints you haven't responded to yet.
 
 Don't let hints derail you from something important you're in the middle of. Finish your current thought, then decide.

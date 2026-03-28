@@ -42,7 +42,9 @@ Snapshot({label?}) Rollback({snapshotId?}) ListSnapshots({}) DiffSnapshot({fromI
 
 ### Observer / Meta
 Emit({type,data}) SetGoal({goal,priority?}) GetGoal({}) DeleteGoal({index}) ClearGoals({}) SetMood({mood}) Sleep({ms}) SleepUntil({iso}) Introspect({}) SelfReport({})
-ListHints({seen?}) — list observer hints (seen=false for pending only). HintRead({id}) — mark seen. HintAccept({id,response?}) HintReject({id,response?}) — respond to a hint; broadcasts response to observer.
+ListHints({seen?}) — list observer hints (seen=false for pending only).
+HintRead({id,response?}) — acknowledge a hint without accepting/rejecting (use for casual remarks or when just noting it); response defaults to "..." if omitted.
+HintAccept({id,response?}) HintReject({id,response?}) — respond to a suggestion hint; broadcasts response to observer.
 `;
 
 module.exports = TOOL_REF;

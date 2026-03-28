@@ -77,9 +77,15 @@ async function ListHints({ seen } = {}) {
   return { ok: true, result: filtered };
 }
 
-async function HintRead({ id }) {
+async function HintRead({ id, response } = {}) {
   if (!id) return { ok: false, error: 'id is required' };
-  return updateHint(id, { seen: true });
+  const patch = { seen: true };
+  if (response !== undefined && response !== '') patch.response = response;
+  else patch.response = '...';
+  patch.respondedAt = new Date().toISOString();
+  const r = updateHint(id, patch);
+  if (r.ok && _broadcast) _broadcast({ type: 'hint_response', data: { id, status: 'read', response: patch.response } });
+  return r;
 }
 
 async function HintAccept({ id, response = '' }) {
