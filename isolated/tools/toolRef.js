@@ -21,7 +21,8 @@ CronList({}) — list all active cron job ids. CronCancel({id}) — stop and rem
 
 ### Modules
 TryLoadModule({path}) TryUnloadModule({name}) ReloadModule({name}) TestModule({path}) RunModule({path|name}) ListModules({})
-CallModule({name,fn,args?}) — call an exported function on a loaded module. name=module filename without .js, fn=function name, args=plain object passed as first argument.
+InspectModule({name}) — inspect a loaded module: lists exported functions (name, isAsync, params) and any meta/info export.
+CallModule({name,fn,args?}) — call an exported function on a loaded module. name=module filename without .js, fn=function name, args=plain object passed as first argument. 30s timeout. On fn-not-found, returns availableFunctions list.
 Paths must be in /open/modules/.
 
 ### Memory

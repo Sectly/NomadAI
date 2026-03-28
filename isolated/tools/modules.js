@@ -93,30 +93,92 @@ try {
   }
 }
 
+// Returns a description of a loaded module's exports:
+// - functions with names, async flag, and extracted parameter names
+// - non-function exports and their types
+// - any meta/info object the module exposes as module.exports.meta (or .info / .describe)
+async function InspectModule({ name }) {
+  if (!name || typeof name !== 'string') return { ok: false, error: 'name is required' };
+  if (!loadedModules.has(name)) return { ok: false, error: `Module not loaded: ${name}` };
+
+  const { mod, path: modPath, loadedAt } = loadedModules.get(name);
+
+  const functions = [];
+  const values    = [];
+
+  for (const [key, val] of Object.entries(mod || {})) {
+    if (key === '__esModule') continue;
+    if (typeof val === 'function') {
+      const isAsync = val.constructor?.name === 'AsyncFunction';
+      let params = [];
+      try {
+        const src = val.toString();
+        // match (a, b = 1, {c}) style param lists
+        const m = src.match(/^(?:async\s+)?(?:function\s*\w*\s*)?\(([^)]*)\)/);
+        if (m && m[1].trim()) {
+          params = m[1].split(',').map(s => s.trim().replace(/\s*=.*$/, '').replace(/^\{.*\}$/, '{…}')).filter(Boolean);
+        }
+      } catch (_) {}
+      functions.push({ name: key, isAsync, params });
+    } else {
+      const isObj = typeof val === 'object' && val !== null;
+      values.push({ key, type: typeof val, value: isObj ? JSON.stringify(val) : val });
+    }
+  }
+
+  // Honour a conventional meta export so modules can self-describe
+  const meta = mod?.meta ?? mod?.info ?? mod?.describe ?? null;
+
+  return { ok: true, result: { name, path: modPath, loadedAt, functions, values, meta } };
+}
+
+const CALL_TIMEOUT_MS = 30000;
+
 async function CallModule({ name, fn, args = {} }) {
   if (!name || typeof name !== 'string') return { ok: false, error: 'name is required' };
   if (!fn   || typeof fn   !== 'string') return { ok: false, error: 'fn is required' };
 
-  if (!loadedModules.has(name)) return { ok: false, error: `Module not loaded: ${name}` };
+  if (!loadedModules.has(name)) {
+    const loaded = [...loadedModules.keys()];
+    return { ok: false, error: `Module not loaded: "${name}". Loaded modules: [${loaded.join(', ') || 'none'}]` };
+  }
 
   const { mod } = loadedModules.get(name);
 
   if (!mod || typeof mod[fn] !== 'function') {
-    const exported = mod ? Object.keys(mod).filter(k => typeof mod[k] === 'function').join(', ') : '(none)';
-    return { ok: false, error: `Function "${fn}" not found in module "${name}". Exported functions: ${exported || '(none)'}` };
+    const fns  = mod ? Object.keys(mod).filter(k => typeof mod[k] === 'function') : [];
+    const vals = mod ? Object.keys(mod).filter(k => typeof mod[k] !== 'function' && k !== '__esModule') : [];
+    return {
+      ok: false,
+      error: `Function "${fn}" not found in "${name}".`,
+      result: { availableFunctions: fns, otherExports: vals },
+    };
   }
 
-  // args must be a plain object — reject anything that could smuggle in dangerous values
   if (typeof args !== 'object' || Array.isArray(args) || args === null) {
     return { ok: false, error: 'args must be a plain object' };
   }
 
+  let raw;
   try {
-    const result = await Promise.resolve(mod[fn](args));
-    return { ok: true, result: result ?? null };
+    raw = await Promise.race([
+      Promise.resolve(mod[fn](args)),
+      new Promise((_, rej) =>
+        setTimeout(() => rej(new Error(`CallModule timed out after ${CALL_TIMEOUT_MS}ms`)), CALL_TIMEOUT_MS)
+      ),
+    ]);
   } catch (e) {
     return { ok: false, error: `${name}.${fn} threw: ${e.message}` };
   }
+
+  // Ensure the result can be serialised before returning
+  try {
+    JSON.stringify(raw);
+  } catch (_) {
+    return { ok: true, result: String(raw), warning: 'Result was not JSON-serialisable — converted to string' };
+  }
+
+  return { ok: true, result: raw ?? null };
 }
 
 // Runs a module as a script in a fresh subprocess and returns its stdout/stderr.
@@ -166,4 +228,4 @@ async function ListModules() {
   return { ok: true, result };
 }
 
-module.exports = { TryLoadModule, TryUnloadModule, ReloadModule, TestModule, RunModule, ListModules, CallModule };
+module.exports = { TryLoadModule, TryUnloadModule, ReloadModule, TestModule, RunModule, InspectModule, ListModules, CallModule };
