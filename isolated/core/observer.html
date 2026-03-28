@@ -61,6 +61,10 @@
     .breadcrumb{color:#7ec8e3;font-size:11px;padding:4px 8px;border-bottom:1px solid #1a1a1a;flex-shrink:0}
     .hint .etype{color:#f0a500}
     .hint_request .etype{color:#c792ea}
+    .hint_response .etype{color:#5fca7a}
+    .hint_response.accepted .etype{color:#5fca7a}
+    .hint_response.rejected .etype{color:#ff7070}
+    .hint_response.read .etype{color:#7ec8e3}
     /* Hint bar */
     #hint-bar{display:flex;gap:6px;padding:6px 10px;background:#111;border-top:1px solid #222;flex-shrink:0}
     #hint-input{flex:1;background:#1a1a1a;border:1px solid #333;color:#e0e0e0;padding:4px 8px;font-family:monospace;font-size:12px;border-radius:2px;outline:none}
@@ -148,9 +152,18 @@
   const ALERT_TYPES   = new Set(['blocked_action','error','restart_request','shutdown','hint','hint_request','hint_response']);
   function addEntry(panel, ev) {
     const el = document.createElement('div');
-    el.className = 'entry ' + ev.type;
     const ts = new Date().toLocaleTimeString();
-    const body = typeof ev.data === 'object' ? JSON.stringify(ev.data) : String(ev.data||'');
+    let body;
+    let extraClass = '';
+    if (ev.type === 'hint_response' && ev.data && typeof ev.data === 'object') {
+      const status = ev.data.status || 'read';
+      const resp = ev.data.response ? ' — "' + ev.data.response + '"' : '';
+      body = 'AI ' + status + ' hint' + resp;
+      extraClass = ' ' + status;
+    } else {
+      body = typeof ev.data === 'object' ? JSON.stringify(ev.data) : String(ev.data||'');
+    }
+    el.className = 'entry ' + ev.type + extraClass;
     el.innerHTML = '<span class="ts">'+ts+'</span><span class="etype">['+ev.type+']</span>'+esc(body);
     panel.appendChild(el);
     panel.scrollTop = panel.scrollHeight;
