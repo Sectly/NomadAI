@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>NomadAI Observer</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#0d0d0d;color:#e0e0e0;font-family:monospace;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+    #topbar{display:flex;align-items:center;gap:16px;padding:6px 14px;background:#111;border-bottom:1px solid #222;flex-shrink:0}
+    #topbar h1{font-size:13px;color:#7ec8e3;letter-spacing:1px;font-weight:bold}
+    #status{font-size:11px;color:#555;margin-left:auto}
+    #status.connected{color:#a8ff78}
+    #tabs{display:flex;gap:0;background:#111;border-bottom:1px solid #222;flex-shrink:0}
+    .tab{padding:7px 18px;font-size:12px;cursor:pointer;color:#888;border-right:1px solid #1e1e1e;user-select:none}
+    .tab:hover{color:#ccc}
+    .tab.active{color:#7ec8e3;border-bottom:2px solid #7ec8e3}
+    #content{flex:1;overflow:hidden;position:relative}
+    .page{display:none;height:100%;overflow:hidden}
+    .page.active{display:flex;gap:8px;padding:8px}
+    /* Live page */
+    .panel{flex:1;display:flex;flex-direction:column;min-width:0}
+    .panel h3{font-size:11px;color:#7ec8e3;text-transform:uppercase;letter-spacing:1px;padding:4px 0;flex-shrink:0}
+    .scroll{flex:1;overflow-y:auto;background:#111;border:1px solid #222;padding:6px;font-size:11px;line-height:1.7}
+    .entry{border-bottom:1px solid #1a1a1a;padding:3px 0;word-break:break-all}
+    .ts{color:#555;margin-right:6px}
+    .etype{margin-right:6px;font-weight:bold}
+    .thought .etype,.plan .etype{color:#7ec8e3}
+    .tool_call .etype{color:#a8ff78}
+    .tool_result .etype{color:#5c9e5c}
+    .blocked_action .etype,.error .etype{color:#ff5e5e}
+    .memory_update .etype,.module_load .etype,.module_unload .etype{color:#c792ea}
+    .restart_request .etype{color:#f0a500}
+    .boot .etype{color:#fff}
+    /* Files page */
+    #files-page{flex-direction:row}
+    #file-tree{width:240px;flex-shrink:0;border:1px solid #222;overflow-y:auto;font-size:12px;background:#111}
+    #file-tree .item{padding:3px 8px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #file-tree .item:hover{background:#1a1a1a}
+    #file-tree .item.dir{color:#7ec8e3}
+    #file-tree .item.sel{background:#1e2e1e}
+    #file-view{flex:1;display:flex;flex-direction:column;min-width:0}
+    #file-view h3{font-size:11px;color:#7ec8e3;padding:4px 0;flex-shrink:0}
+    #file-content{flex:1;overflow:auto;background:#111;border:1px solid #222;padding:8px;font-size:11px;line-height:1.6;white-space:pre-wrap;word-break:break-all}
+    /* Data pages shared */
+    .data-page{flex-direction:column;gap:0;padding:0}
+    .data-scroll{flex:1;overflow-y:auto;padding:10px 14px;font-size:12px}
+    .data-item{padding:6px 0;border-bottom:1px solid #1a1a1a}
+    .key{color:#7ec8e3;font-weight:bold}
+    .val{color:#e0e0e0;word-break:break-all}
+    .meta{color:#555;font-size:11px}
+    .badge{display:inline-block;padding:1px 7px;border-radius:3px;font-size:11px;margin-right:6px}
+    .badge.high{background:#4a1515;color:#ff5e5e}
+    .badge.normal{background:#1a2a1a;color:#a8ff78}
+    .badge.low{background:#1a1a2a;color:#7ec8e3}
+    .badge.pending{background:#2a2a0a;color:#f0a500}
+    .badge.approved{background:#0a2a0a;color:#a8ff78}
+    .badge.denied{background:#2a0a0a;color:#ff5e5e}
+    .toolbar{padding:6px 10px;background:#111;border-bottom:1px solid #222;font-size:12px;color:#555;display:flex;gap:10px;align-items:center;flex-shrink:0}
+    .toolbar button{background:#1a1a1a;border:1px solid #333;color:#ccc;padding:2px 10px;cursor:pointer;font-family:monospace;font-size:11px;border-radius:2px}
+    .toolbar button:hover{background:#222}
+    .breadcrumb{color:#7ec8e3;font-size:11px;padding:4px 8px;border-bottom:1px solid #1a1a1a;flex-shrink:0}
+  </style>
+</head>
+<body>
+  <div id="topbar">
+    <h1>NomadAI Observer</h1>
+    <span id="status">disconnected</span>
+  </div>
+  <div id="tabs">
+    <div class="tab active" data-page="live">Live Events</div>
+    <div class="tab" data-page="files">Files</div>
+    <div class="tab" data-page="memory">Memory</div>
+    <div class="tab" data-page="goals">Goals</div>
+    <div class="tab" data-page="restarts">Restarts</div>
+    <div class="tab" data-page="snapshots">Snapshots</div>
+  </div>
+  <div id="content">
+    <!-- Live Events page -->
+    <div class="page active" id="page-live">
+      <div class="panel"><h3>Thoughts &amp; Plans</h3><div class="scroll" id="p-thoughts"></div></div>
+      <div class="panel"><h3>Tools &amp; Actions</h3><div class="scroll" id="p-commands"></div></div>
+      <div class="panel"><h3>Errors &amp; Alerts</h3><div class="scroll" id="p-alerts"></div></div>
+    </div>
+    <!-- Files page -->
+    <div class="page" id="page-files">
+      <div id="files-page" style="display:flex;width:100%;height:100%;gap:8px;padding:8px">
+        <div id="file-tree"></div>
+        <div id="file-view">
+          <h3 id="file-path-label">Select a file</h3>
+          <div id="file-content" style="color:#555">Click a file in the tree to view its contents.</div>
+        </div>
+      </div>
+    </div>
+    <!-- Memory page -->
+    <div class="page data-page" id="page-memory">
+      <div class="toolbar">Long-Term Memory <button onclick="loadMemory()">Refresh</button></div>
+      <div class="data-scroll" id="mem-list"></div>
+    </div>
+    <!-- Goals page -->
+    <div class="page data-page" id="page-goals">
+      <div class="toolbar">Goals <button onclick="loadGoals()">Refresh</button></div>
+      <div class="data-scroll" id="goals-list"></div>
+    </div>
+    <!-- Restarts page -->
+    <div class="page data-page" id="page-restarts">
+      <div class="toolbar">Restart History <button onclick="loadRestarts()">Refresh</button></div>
+      <div class="data-scroll" id="restarts-list"></div>
+    </div>
+    <!-- Snapshots page -->
+    <div class="page data-page" id="page-snapshots">
+      <div class="toolbar">Snapshots <button onclick="loadSnapshots()">Refresh</button></div>
+      <div class="data-scroll" id="snapshots-list"></div>
+    </div>
+  </div>
+  <script>
+  // ── Tab switching ──
+  const tabs = document.querySelectorAll('.tab');
+  const pages = document.querySelectorAll('.page');
+  tabs.forEach(t => t.addEventListener('click', () => {
+    tabs.forEach(x => x.classList.remove('active'));
+    pages.forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('page-' + t.dataset.page).classList.add('active');
+    const loaders = {files:loadFiles, memory:loadMemory, goals:loadGoals, restarts:loadRestarts, snapshots:loadSnapshots};
+    if (loaders[t.dataset.page]) loaders[t.dataset.page]();
+  }));
+
+  // ── Live events ──
+  const pThoughts = document.getElementById('p-thoughts');
+  const pCommands = document.getElementById('p-commands');
+  const pAlerts   = document.getElementById('p-alerts');
+  const statusEl  = document.getElementById('status');
+  const THOUGHT_TYPES = new Set(['thought','plan','boot']);
+  const ALERT_TYPES   = new Set(['blocked_action','error','restart_request','shutdown']);
+  function addEntry(panel, ev) {
+    const el = document.createElement('div');
+    el.className = 'entry ' + ev.type;
+    const ts = new Date().toLocaleTimeString();
+    const body = typeof ev.data === 'object' ? JSON.stringify(ev.data) : String(ev.data||'');
+    el.innerHTML = '<span class="ts">'+ts+'</span><span class="etype">['+ev.type+']</span>'+esc(body);
+    panel.appendChild(el);
+    panel.scrollTop = panel.scrollHeight;
+    if (panel.children.length > 500) panel.removeChild(panel.firstChild);
+  }
+  function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  const WS_TOKEN = '__WS_TOKEN__';
+  function connect() {
+    const url = 'ws://'+location.hostname+':__WS_PORT__' + (WS_TOKEN ? '?token='+encodeURIComponent(WS_TOKEN) : '');
+    const ws = new WebSocket(url);
+    ws.onopen  = () => { statusEl.textContent='connected'; statusEl.className='connected'; };
+    ws.onclose = (e) => {
+      statusEl.textContent = e.code === 4401 ? 'auth failed' : 'disconnected';
+      statusEl.className='';
+      if (e.code !== 4401) setTimeout(connect, 3000);
+    };
+    ws.onmessage = (e) => {
+      try {
+        const ev = JSON.parse(e.data);
+        if      (THOUGHT_TYPES.has(ev.type)) addEntry(pThoughts, ev);
+        else if (ALERT_TYPES.has(ev.type))   addEntry(pAlerts, ev);
+        else                                  addEntry(pCommands, ev);
+      } catch(_) {}
+    };
+  }
+  connect();
+
+  // ── Files ──
+  let fileNavPath = '';
+  async function loadFiles(rel) {
+    rel = rel !== undefined ? rel : fileNavPath;
+    fileNavPath = rel;
+    const tree = document.getElementById('file-tree');
+    let data;
+    try {
+      const r = await fetch('/api/files?path='+encodeURIComponent(rel||''));
+      data = await r.json();
+    } catch(e) { tree.innerHTML = '<div class="item" style="color:#ff5e5e">Fetch error: '+esc(String(e))+'</div>'; return; }
+    tree.innerHTML = '';
+    if (data.error) { tree.innerHTML = '<div class="item" style="color:#ff5e5e">'+esc(data.error)+'</div>'; return; }
+    const label = '/open/' + (rel ? (rel.startsWith('/') ? rel.slice(1) : rel) : '');
+    const bc = document.createElement('div');
+    bc.className='breadcrumb'; bc.textContent=label; tree.appendChild(bc);
+    if (rel) {
+      const up = document.createElement('div');
+      up.className='item dir'; up.textContent='../';
+      const parent = rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '';
+      up.onclick = () => loadFiles(parent);
+      tree.appendChild(up);
+    }
+    for (const e of data) {
+      const el = document.createElement('div');
+      el.className = 'item' + (e.isDir ? ' dir' : '');
+      el.textContent = e.isDir ? e.name+'/' : e.name + (e.size!=null?' ('+fmtSize(e.size)+')':'');
+      const entryPath = (rel ? rel.replace(/\/$/,'')+'/' : '') + e.name;
+      if (e.isDir) { el.onclick = () => loadFiles(entryPath); }
+      else { el.onclick = () => loadFileContent(entryPath, el); }
+      tree.appendChild(el);
+    }
+  }
+  function fmtSize(b) { return b<1024?b+'b': b<1024*1024?(b/1024).toFixed(1)+'kb': (b/1024/1024).toFixed(2)+'mb'; }
+  async function loadFileContent(relPath, clickedEl) {
+    document.querySelectorAll('#file-tree .item').forEach(x=>x.classList.remove('sel'));
+    if (clickedEl) clickedEl.classList.add('sel');
+    document.getElementById('file-path-label').textContent = '/open/' + relPath;
+    const fc = document.getElementById('file-content');
+    fc.textContent = 'Loading...';
+    try {
+      const r = await fetch('/api/file?path='+encodeURIComponent(relPath));
+      const data = await r.json();
+      if (data.error) { fc.style.color='#ff5e5e'; fc.textContent=data.error; return; }
+      fc.style.color='#e0e0e0';
+      fc.textContent = data.content;
+    } catch(e) { fc.style.color='#ff5e5e'; fc.textContent='Fetch error: '+String(e); }
+  }
+
+  // ── Memory ──
+  async function loadMemory() {
+    const el = document.getElementById('mem-list');
+    try {
+      const data = await fetch('/api/memory').then(r=>r.json());
+      el.innerHTML = '';
+      const keys = Object.keys(data);
+      if (!keys.length) { el.innerHTML = '<div style="color:#555">No memory entries.</div>'; return; }
+      for (const k of keys) {
+        const v = data[k];
+        const d = document.createElement('div'); d.className='data-item';
+        const tags = (v.tags||[]).length ? '<span class="meta">tags: '+esc(v.tags.join(', '))+'</span> ' : '';
+        const upd  = v.updatedAt ? '<span class="meta">'+esc(v.updatedAt)+'</span>' : '';
+        d.innerHTML = '<span class="key">'+esc(k)+'</span><br><span class="val">'+esc(JSON.stringify(v.value))+'</span><br>'+tags+upd;
+        el.appendChild(d);
+      }
+    } catch(e) { el.innerHTML = '<div style="color:#ff5e5e">Error: '+esc(String(e))+'</div>'; }
+  }
+
+  // ── Goals ──
+  async function loadGoals() {
+    const el = document.getElementById('goals-list');
+    try {
+      const data = await fetch('/api/goals').then(r=>r.json());
+      el.innerHTML = '';
+      if (!data.length) { el.innerHTML = '<div style="color:#555">No goals.</div>'; return; }
+      for (const g of data) {
+        const d = document.createElement('div'); d.className='data-item';
+        const pri = g.priority||'normal';
+        d.innerHTML = '<span class="badge '+esc(pri)+'">'+esc(pri)+'</span><span class="val">'+esc(g.goal)+'</span><br><span class="meta">'+esc(g.createdAt||'')+'</span>';
+        el.appendChild(d);
+      }
+    } catch(e) { el.innerHTML = '<div style="color:#ff5e5e">Error: '+esc(String(e))+'</div>'; }
+  }
+
+  // ── Restarts ──
+  async function loadRestarts() {
+    const el = document.getElementById('restarts-list');
+    try {
+      const data = await fetch('/api/restarts').then(r=>r.json());
+      el.innerHTML = '';
+      if (!data.length) { el.innerHTML = '<div style="color:#555">No restart history.</div>'; return; }
+      for (const rs of [...data].reverse()) {
+        const d = document.createElement('div'); d.className='data-item';
+        const st = rs.status||'pending';
+        d.innerHTML = '<span class="badge '+esc(st)+'">'+esc(st)+'</span><span class="meta">'+esc(rs.timestamp||'')+'</span><br><span class="val">'+esc(rs.reason||'(no reason)')+'</span>'+(rs.outcome?'<br><span class="meta">outcome: '+esc(rs.outcome)+'</span>':'');
+        el.appendChild(d);
+      }
+    } catch(e) { el.innerHTML = '<div style="color:#ff5e5e">Error: '+esc(String(e))+'</div>'; }
+  }
+
+  // ── Snapshots ──
+  async function loadSnapshots() {
+    const el = document.getElementById('snapshots-list');
+    try {
+      const data = await fetch('/api/snapshots').then(r=>r.json());
+      el.innerHTML = '';
+      if (!data.length) { el.innerHTML = '<div style="color:#555">No snapshots.</div>'; return; }
+      for (const s of [...data].reverse()) {
+        const d = document.createElement('div'); d.className='data-item';
+        d.innerHTML = '<span class="key">'+esc(s.id)+'</span> <span class="meta">'+esc(s.timestamp||'')+'</span>'+(s.label?'<br><span class="val">'+esc(s.label)+'</span>':'')+(s.note?'<br><span class="meta">'+esc(s.note)+'</span>':'');
+        el.appendChild(d);
+      }
+    } catch(e) { el.innerHTML = '<div style="color:#ff5e5e">Error: '+esc(String(e))+'</div>'; }
+  }
+  </script>
+</body>
+</html>
