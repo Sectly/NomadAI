@@ -269,6 +269,10 @@ done
 cd "${NOMAD_DIR}"
 if [ -f package.json ]; then
   echo "[bun] Installing project dependencies as '${NOMAD_USER}'..."
+  # node_modules lives in NOMAD_DIR (root:root 755) so nomadai can't create it.
+  # Pre-create and hand it off before running bun install.
+  mkdir -p "${NOMAD_DIR}/node_modules"
+  chown "${NOMAD_USER}:${NOMAD_GROUP}" "${NOMAD_DIR}/node_modules"
   sudo -u "${NOMAD_USER}" \
     HOME="${NOMAD_HOME}" \
     BUN_INSTALL="${BUN_HOME}" \
