@@ -66,6 +66,16 @@ async function TimeNow() {
   return { ok: true, result: { iso: now.toISOString(), unix: Math.floor(now.getTime() / 1000) } };
 }
 
+async function CurrentTime() {
+  const now = new Date();
+  return { ok: true, result: { time: now.toLocaleTimeString(), iso: now.toISOString(), hours: now.getHours(), minutes: now.getMinutes(), seconds: now.getSeconds() } };
+}
+
+async function CurrentDate() {
+  const now = new Date();
+  return { ok: true, result: { date: now.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }), iso: now.toISOString().slice(0, 10), year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() } };
+}
+
 async function CorePing(args, ctx) {
   return {
     ok: true,
@@ -96,5 +106,5 @@ async function OSLastRestart() {
 
 module.exports = {
   OSInfo, BunInfo, DiskUsage, MemUsage, CPUInfo, NetworkInfo,
-  Uptime, TimeNow, CorePing, OSRequestRestart, OSListRestarts, OSLastRestart,
+  Uptime, TimeNow, CurrentTime, CurrentDate, CorePing, OSRequestRestart, OSListRestarts, OSLastRestart,
 };

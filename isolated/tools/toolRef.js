@@ -30,7 +30,7 @@ MemoryRead({key}) MemoryWrite({key,value,tags?}) MemorySearch({query}) MemoryLis
 MemorySummarise({}) History({limit?}) ThoughtLog({entry}) ThoughtHistory({limit?})
 
 ### System Info
-OSInfo({}) BunInfo({}) DiskUsage({path?}) MemUsage({}) CPUInfo({}) NetworkInfo({}) Uptime({}) TimeNow({})
+OSInfo({}) BunInfo({}) DiskUsage({path?}) MemUsage({}) CPUInfo({}) NetworkInfo({}) Uptime({}) TimeNow({}) CurrentTime({}) CurrentDate({})
 CorePing({}) OSRequestRestart({reason}) OSListRestarts({}) OSLastRestart({})
 
 ### Network
