@@ -119,6 +119,42 @@ async function CallModule({ name, fn, args = {} }) {
   }
 }
 
+// Runs a module as a script in a fresh subprocess and returns its stdout/stderr.
+// The module's top-level code executes; anything written to stdout/stderr is captured.
+// Hard timeout: 45 seconds.
+async function RunModule({ path: p }) {
+  if (!p.startsWith('/open/modules/')) {
+    return { ok: false, error: 'RunModule is restricted to /open/modules/' };
+  }
+  const real = resolvePath(p);
+  if (!fs.existsSync(real)) return { ok: false, error: `File not found: ${p}` };
+
+  const TIMEOUT_MS = 45000;
+  try {
+    const proc = Bun.spawn([process.execPath, 'run', real], {
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; try { proc.kill(); } catch (_) {} }, TIMEOUT_MS);
+
+    const [stdout, stderr] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+    ]);
+    const exitCode = await proc.exited;
+    clearTimeout(timer);
+
+    return {
+      ok: !timedOut && exitCode === 0,
+      result: { stdout: stdout.trim(), stderr: stderr.trim(), exitCode, timedOut },
+    };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
 async function ListModules() {
   const result = [];
   for (const [name, info] of loadedModules.entries()) {
@@ -127,4 +163,4 @@ async function ListModules() {
   return { ok: true, result };
 }
 
-module.exports = { TryLoadModule, TryUnloadModule, ReloadModule, TestModule, ListModules, CallModule };
+module.exports = { TryLoadModule, TryUnloadModule, ReloadModule, TestModule, RunModule, ListModules, CallModule };
