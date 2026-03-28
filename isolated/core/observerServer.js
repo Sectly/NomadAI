@@ -165,17 +165,28 @@ function broadcast(event) {
   }
 
   const line = formatEvent(event);
-  for (const [, sess] of ncSessions) {
+  for (const [sock, sess] of ncSessions) {
     if (!sess.authed || !sess.streaming) continue;
     if (sess.filter && !event.type.includes(sess.filter)) continue;
-    try { sess.socket.write(line); } catch (_) {}
+    try {
+      ncWrite(sess,line);
+    } catch (_) {
+      // Socket died — clean up so it doesn't accumulate
+      clearTimeout(sess.authTimer);
+      ncSessions.delete(sock);
+    }
   }
+}
+
+// Safe write helper — swallows errors so a dead socket doesn't throw
+function ncWrite(sess, data) {
+  try { ncWrite(sess,data); } catch (_) {}
 }
 
 // ── NC command handler ────────────────────────────────────────────────────────
 async function handleCommand(sess, raw) {
   const line = raw.trim();
-  if (!line) { sess.socket.write('> '); return; }
+  if (!line) { ncWrite(sess,'> '); return; }
 
   const [cmd, ...rest] = line.split(' ');
   const arg = rest.join(' ').trim();
@@ -190,11 +201,11 @@ async function handleCommand(sess, raw) {
         ? recentEvents.filter(e => e.type.includes(arg))
         : recentEvents.slice();
       if (replay.length) {
-        sess.socket.write(`[stream] --- last ${replay.length} buffered event(s) ---\r\n`);
-        for (const e of replay) sess.socket.write(formatEvent(e));
-        sess.socket.write('[stream] --- live ---\r\n');
+        ncWrite(sess,`[stream] --- last ${replay.length} buffered event(s) ---\r\n`);
+        for (const e of replay) ncWrite(sess,formatEvent(e));
+        ncWrite(sess,'[stream] --- live ---\r\n');
       }
-      sess.socket.write(
+      ncWrite(sess,
         arg
           ? `[stream] Live stream started (filter: ${arg}). Type "stop" to end.\r\n`
           : `[stream] Live stream started (all events). Type "stop" to end.\r\n`
@@ -205,7 +216,7 @@ async function handleCommand(sess, raw) {
     case 'stop':
       sess.streaming = false;
       sess.filter = null;
-      sess.socket.write('[stream] Stopped.\r\n> ');
+      ncWrite(sess,'[stream] Stopped.\r\n> ');
       break;
 
     case 'status': {
@@ -217,7 +228,7 @@ async function handleCommand(sess, raw) {
       try { memCount = Object.keys(JSON.parse(fs.readFileSync(LT_FILE, 'utf8'))).length; } catch (_) {}
       let snapCount = 0;
       try { snapCount = fs.readdirSync(SNAPSHOTS_DIR).filter(f => f.endsWith('.json')).length; } catch (_) {}
-      sess.socket.write(
+      ncWrite(sess,
         `[status] uptime=${h}h${m}m${s}s  ws=${wsClients.size}  nc=${ncSessions.size}  memory_keys=${memCount}  snapshots=${snapCount}\r\n> `
       );
       break;
@@ -226,10 +237,10 @@ async function handleCommand(sess, raw) {
     case 'goals': {
       let goals = [];
       try { goals = JSON.parse(fs.readFileSync(GOALS_FILE, 'utf8')); } catch (_) {}
-      if (!goals.length) { sess.socket.write('[goals] (none)\r\n> '); break; }
+      if (!goals.length) { ncWrite(sess,'[goals] (none)\r\n> '); break; }
       for (const g of goals)
-        sess.socket.write(`[goals] [${g.priority}] ${g.goal}  (${g.createdAt})\r\n`);
-      sess.socket.write('> ');
+        ncWrite(sess,`[goals] [${g.priority}] ${g.goal}  (${g.createdAt})\r\n`);
+      ncWrite(sess,'> ');
       break;
     }
 
@@ -239,15 +250,15 @@ async function handleCommand(sess, raw) {
       if (!arg) {
         // List all keys
         const keys = Object.keys(lt);
-        if (!keys.length) { sess.socket.write('[memory] (empty)\r\n> '); break; }
+        if (!keys.length) { ncWrite(sess,'[memory] (empty)\r\n> '); break; }
         for (const k of keys)
-          sess.socket.write(`[memory] ${k}  (updated: ${lt[k].updatedAt || '?'})\r\n`);
-        sess.socket.write('> ');
+          ncWrite(sess,`[memory] ${k}  (updated: ${lt[k].updatedAt || '?'})\r\n`);
+        ncWrite(sess,'> ');
         break;
       }
       const entry = lt[arg];
-      if (!entry) { sess.socket.write(`[memory] Key not found: ${arg}\r\n> `); break; }
-      sess.socket.write(`[memory] ${arg} = ${JSON.stringify(entry.value)}  (tags: ${(entry.tags || []).join(', ') || 'none'})\r\n> `);
+      if (!entry) { ncWrite(sess,`[memory] Key not found: ${arg}\r\n> `); break; }
+      ncWrite(sess,`[memory] ${arg} = ${JSON.stringify(entry.value)}  (tags: ${(entry.tags || []).join(', ') || 'none'})\r\n> `);
       break;
     }
 
@@ -255,9 +266,9 @@ async function handleCommand(sess, raw) {
       // Read modules dir listing as a proxy — loaded state is in-process
       let mods = [];
       try { mods = fs.readdirSync(path.join(OPEN_DIR, 'modules')).filter(f => f.endsWith('.js') && f !== 'example.js'); } catch (_) {}
-      if (!mods.length) { sess.socket.write('[modules] (none written yet)\r\n> '); break; }
-      for (const m of mods) sess.socket.write(`[modules] ${m}\r\n`);
-      sess.socket.write('> ');
+      if (!mods.length) { ncWrite(sess,'[modules] (none written yet)\r\n> '); break; }
+      for (const m of mods) ncWrite(sess,`[modules] ${m}\r\n`);
+      ncWrite(sess,'> ');
       break;
     }
 
@@ -267,12 +278,12 @@ async function handleCommand(sess, raw) {
         const vm = require('../core/versionManager');
         const result = await vm.snapshot('observer-manual');
         if (result.ok) {
-          sess.socket.write(`[snapshot] Created: ${result.result.id}\r\n> `);
+          ncWrite(sess,`[snapshot] Created: ${result.result.id}\r\n> `);
         } else {
-          sess.socket.write(`[snapshot] Failed: ${result.error}\r\n> `);
+          ncWrite(sess,`[snapshot] Failed: ${result.error}\r\n> `);
         }
       } catch (e) {
-        sess.socket.write(`[snapshot] Error: ${e.message}\r\n> `);
+        ncWrite(sess,`[snapshot] Error: ${e.message}\r\n> `);
       }
       break;
     }
@@ -282,9 +293,9 @@ async function handleCommand(sess, raw) {
       let lines = [];
       try { lines = fs.readFileSync(THOUGHTS_LOG, 'utf8').split('\n').filter(Boolean); } catch (_) {}
       const tail = lines.slice(-n);
-      if (!tail.length) { sess.socket.write('[thoughts] (empty)\r\n> '); break; }
-      for (const l of tail) sess.socket.write(l + '\r\n');
-      sess.socket.write('> ');
+      if (!tail.length) { ncWrite(sess,'[thoughts] (empty)\r\n> '); break; }
+      for (const l of tail) ncWrite(sess,l + '\r\n');
+      ncWrite(sess,'> ');
       break;
     }
 
@@ -293,32 +304,32 @@ async function handleCommand(sess, raw) {
       let ep = [];
       try { ep = JSON.parse(fs.readFileSync(EP_FILE, 'utf8')); } catch (_) {}
       const tail = ep.slice(-n);
-      if (!tail.length) { sess.socket.write('[history] (empty)\r\n> '); break; }
+      if (!tail.length) { ncWrite(sess,'[history] (empty)\r\n> '); break; }
       for (const e of tail) {
         const argsStr = Object.keys(e.args || {}).length ? ' ' + JSON.stringify(e.args) : '';
-        sess.socket.write(`[history] ${e.ts}  ${e.tool}${argsStr}  ok=${e.ok}\r\n`);
+        ncWrite(sess,`[history] ${e.ts}  ${e.tool}${argsStr}  ok=${e.ok}\r\n`);
       }
-      sess.socket.write('> ');
+      ncWrite(sess,'> ');
       break;
     }
 
     case 'who': {
-      sess.socket.write(`[who] WebSocket clients: ${wsClients.size}\r\n`);
+      ncWrite(sess,`[who] WebSocket clients: ${wsClients.size}\r\n`);
       let i = 1;
       for (const [, s] of ncSessions) {
         const state = s.authed ? (s.streaming ? 'streaming' : 'idle') : 'authenticating';
-        sess.socket.write(`[who] NC #${i++}: ${s.remoteAddr}  [${state}]\r\n`);
+        ncWrite(sess,`[who] NC #${i++}: ${s.remoteAddr}  [${state}]\r\n`);
       }
-      sess.socket.write('> ');
+      ncWrite(sess,'> ');
       break;
     }
 
     case 'clear':
-      sess.socket.write('\x1b[2J\x1b[H> ');
+      ncWrite(sess,'\x1b[2J\x1b[H> ');
       break;
 
     case 'help':
-      sess.socket.write(
+      ncWrite(sess,
         '\r\nAvailable commands:\r\n' +
         '  stream [filter]   Live event stream. Optional type filter (e.g. "stream thought")\r\n' +
         '  stop              Stop stream, return to prompt\r\n' +
@@ -337,12 +348,12 @@ async function handleCommand(sess, raw) {
 
     case 'quit':
     case 'exit':
-      sess.socket.write('Goodbye.\r\n');
-      sess.socket.end();
+      ncWrite(sess,'Goodbye.\r\n');
+      try { sess.socket.end(); } catch (_) {}
       break;
 
     default:
-      sess.socket.write(`[error] Unknown command: ${cmd}. Type "help".\r\n> `);
+      ncWrite(sess,`[error] Unknown command: ${cmd}. Type "help".\r\n> `);
   }
 }
 
@@ -358,7 +369,7 @@ async function handleAuthData(sess, chunk) {
     if (sess.step === 'user') {
       sess.inputUser = val;
       sess.step = 'pass';
-      sess.socket.write('Password: ');
+      ncWrite(sess,'Password: ');
 
     } else if (sess.step === 'pass') {
       // Rate-limit check before doing any password work
@@ -367,8 +378,8 @@ async function handleAuthData(sess, chunk) {
 
       if (!check.allowed) {
         const secs = Math.ceil(check.retryAfterMs / 1000);
-        sess.socket.write(`Authentication failed. Too many attempts — try again in ${secs}s.\r\n`);
-        sess.socket.end();
+        ncWrite(sess,`Authentication failed. Too many attempts — try again in ${secs}s.\r\n`);
+        try { sess.socket.end(); } catch (_) {}
         return;
       }
 
@@ -385,7 +396,7 @@ async function handleAuthData(sess, chunk) {
         sess.step = 'ready';
         sess.buf = '';
         clearTimeout(sess.authTimer);
-        sess.socket.write(
+        ncWrite(sess,
           `\r\nWelcome to NomadAI Observer  [${new Date().toLocaleString()}]\r\n` +
           'Type "help" for commands, "stream" to start live feed.\r\n\r\n> '
         );
@@ -393,15 +404,15 @@ async function handleAuthData(sess, chunk) {
         rateRecordFailure(ip);
         const remaining = RATE.MAX_ATTEMPTS - getRateEntry(ip).attempts.length;
         if (remaining > 0) {
-          sess.socket.write(`Authentication failed. ${remaining} attempt(s) remaining.\r\n`);
+          ncWrite(sess,`Authentication failed. ${remaining} attempt(s) remaining.\r\n`);
           // Let them retry
           sess.step = 'user';
           sess.inputUser = '';
-          sess.socket.write('Username: ');
+          ncWrite(sess,'Username: ');
         } else {
           const secs = Math.ceil(RATE.BLOCK_MS / 1000);
-          sess.socket.write(`Authentication failed. Blocked for ${secs}s.\r\n`);
-          sess.socket.end();
+          ncWrite(sess,`Authentication failed. Blocked for ${secs}s.\r\n`);
+          try { sess.socket.end(); } catch (_) {}
         }
       }
     }

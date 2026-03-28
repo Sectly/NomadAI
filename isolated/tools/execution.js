@@ -88,7 +88,7 @@ async function Cron({ schedule, command, id }) {
     cronJobs.delete(id);
   }
 
-  const handle = setInterval(() => exec(command), ms);
+  const handle = setInterval(() => exec(command).catch(() => {}), ms);
   cronJobs.set(id, handle);
   return { ok: true, result: `Cron "${id}" scheduled every ${schedule} → ${command}` };
 }

@@ -10,8 +10,19 @@ function loadLT() {
   try { return JSON.parse(fs.readFileSync(LT_FILE, 'utf8')); } catch (_) { return {}; }
 }
 
+function atomicWrite(filePath, content) {
+  const tmp = filePath + '.tmp';
+  try {
+    fs.writeFileSync(tmp, content, 'utf8');
+    fs.renameSync(tmp, filePath);
+  } catch (e) {
+    try { fs.unlinkSync(tmp); } catch (_) {}
+    throw e;
+  }
+}
+
 function saveLT(data) {
-  fs.writeFileSync(LT_FILE, JSON.stringify(data, null, 2));
+  atomicWrite(LT_FILE, JSON.stringify(data, null, 2));
 }
 
 function loadEp() {
@@ -19,7 +30,7 @@ function loadEp() {
 }
 
 function saveEp(data) {
-  fs.writeFileSync(EP_FILE, JSON.stringify(data, null, 2));
+  atomicWrite(EP_FILE, JSON.stringify(data, null, 2));
 }
 
 async function MemoryRead({ key }) {

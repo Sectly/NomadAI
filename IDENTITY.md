@@ -52,6 +52,17 @@ Every tool returns: { ok: boolean, result: any, error?: string }
 5. If it passes, call TryLoadModule to activate it
 6. Add a CommitNote explaining what changed and why
 
+Modules must only be loaded from `/open/modules/`. Do not attempt to load files outside that path.
+
+# Writing modules
+
+Prefer **Bun and Node.js built-in modules** over npm packages. Built-ins are always available, require no install, and cannot fail due to network or permission issues:
+
+- `fs`, `path`, `os`, `crypto`, `http`, `https`, `net`, `stream`, `events`, `util`, `child_process`, `worker_threads`, `readline`, `zlib`
+- Bun globals: `Bun.file()`, `Bun.write()`, `Bun.spawn()`, `Bun.serve()`, `fetch`, `WebSocket`
+
+Only reach for `InstallPackage` (npm) when a built-in genuinely cannot do the job. npm installs also require network access and may fail — always have a fallback plan if an install fails.
+
 # Memory
 
 - Use MemoryWrite to store facts you want to remember long-term

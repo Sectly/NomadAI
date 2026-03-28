@@ -11,7 +11,18 @@ function resolvePath(p) {
 }
 
 async function TryLoadModule({ path: p }) {
+  // Only allow loading from open/modules/ — no escaping to core or system paths
+  if (!p.startsWith('/open/modules/')) {
+    return { ok: false, error: 'TryLoadModule is restricted to /open/modules/' };
+  }
   const real = resolvePath(p);
+
+  // Auto-snapshot before loading so a bad module can be rolled back
+  try {
+    const vm = require('../core/versionManager');
+    await vm.snapshot('pre-module-load');
+  } catch (_) {}
+
   try {
     delete require.cache[require.resolve(real)];
     const mod = require(real);

@@ -148,15 +148,38 @@ async function shutdown(signal) {
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT',  () => shutdown('SIGINT'));
 
+// ── Global error guards — keep the process alive if an AI module or async
+// callback throws outside the main loop. Log it and emit to observer.
+process.on('uncaughtException', (err) => {
+  console.error('[NomadAI] Uncaught exception:', err.message);
+  try { observerServer.broadcast({ type: 'error', data: { kind: 'uncaught_exception', message: err.message } }); } catch (_) {}
+});
+
+process.on('unhandledRejection', (reason) => {
+  const msg = reason instanceof Error ? reason.message : String(reason);
+  console.error('[NomadAI] Unhandled rejection:', msg);
+  try { observerServer.broadcast({ type: 'error', data: { kind: 'unhandled_rejection', message: msg } }); } catch (_) {}
+});
+
 async function main() {
-  await boot();
+  try {
+    await boot();
+  } catch (err) {
+    console.error('[NomadAI] Boot error (continuing anyway):', err.message);
+  }
+
+  let consecutiveErrors = 0;
 
   while (!shuttingDown) {
     try {
       await loop();
+      consecutiveErrors = 0;
     } catch (err) {
+      consecutiveErrors++;
       console.error('[NomadAI] Loop error:', err.message);
-      await new Promise((r) => setTimeout(r, 3000));
+      // Exponential backoff capped at 30s so a persistent error doesn't spin-loop
+      const backoff = Math.min(consecutiveErrors * 3000, 30_000);
+      await new Promise((r) => setTimeout(r, backoff));
     }
   }
 }
