@@ -26,7 +26,7 @@ case "${ID}" in
     ;;
   debian)
     case "${VERSION_CODENAME:-}" in
-      bullseye|bookworm) ;;  # 11, 12
+      bullseye|bookworm|trixie) ;;  # 11, 12, 13
       *)
         echo "[warn] Untested Debian version: ${PRETTY_NAME}. Continuing anyway."
         ;;
