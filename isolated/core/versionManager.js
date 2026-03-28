@@ -28,7 +28,9 @@ async function snapshot(label = '') {
     return { ok: false, error: result.stderr };
   }
 
-  const meta = { id, label, timestamp: new Date().toISOString(), note: '' };
+  let sizeBytes = null;
+  try { sizeBytes = fs.statSync(tarPath).size; } catch (_) {}
+  const meta = { id, label, timestamp: new Date().toISOString(), note: '', sizeBytes };
   fs.writeFileSync(metaPath(id), JSON.stringify(meta, null, 2));
 
   // Prune oldest snapshots beyond MAX_SNAPSHOTS
@@ -85,7 +87,8 @@ async function diff(fromId, toId) {
   if (!from) return { ok: false, error: 'fromId not found' };
 
   const fromTar = path.join(SNAPSHOTS_DIR, `${from.id}.tar.gz`);
-  const tmpFrom = `/tmp/nomad_diff_from_${Date.now()}`;
+  const uniq = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  const tmpFrom = `/tmp/nomad_diff_from_${uniq}`;
 
   await exec(`mkdir -p "${tmpFrom}" && tar -xzf "${fromTar}" -C "${tmpFrom}"`);
 
@@ -94,7 +97,7 @@ async function diff(fromId, toId) {
   if (toId) {
     const to = snapshots.find((s) => s.id === toId);
     if (!to) return { ok: false, error: 'toId not found' };
-    tmpTo = `/tmp/nomad_diff_to_${Date.now()}`;
+    tmpTo = `/tmp/nomad_diff_to_${uniq}`;
     await exec(`mkdir -p "${tmpTo}" && tar -xzf "${path.join(SNAPSHOTS_DIR, to.id + '.tar.gz')}" -C "${tmpTo}"`);
     toDir = tmpTo;
   } else {

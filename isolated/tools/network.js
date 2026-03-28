@@ -40,6 +40,10 @@ async function WebSearch({ query, limit = 5 }) {
       results.push({ ...links[i], snippet: snippets[i] || '' });
     }
 
+    if (results.length === 0) {
+      return { ok: false, error: 'WebSearch returned no results — the search page structure may have changed or the query returned nothing' };
+    }
+
     return { ok: true, result: results };
   } catch (e) {
     return { ok: false, error: e.message };

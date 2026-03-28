@@ -22,7 +22,9 @@ const _cache = new Map();
 let _turn = 0;
 
 function _key(tool, args) {
-  return tool + ':' + JSON.stringify(args || {});
+  const a = args || {};
+  const sorted = Object.keys(a).sort().reduce((o, k) => { o[k] = a[k]; return o; }, {});
+  return tool + ':' + JSON.stringify(sorted);
 }
 
 function _expired(entry) {

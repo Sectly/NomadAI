@@ -22,7 +22,7 @@ Never use real OS paths. Writes blocked outside /open/. Reads allowed from /open
 ### Execution
 Execute({command,cwd?,timeout?}) KillProcess({pid}) ListProcesses({}) GetEnv({key?}) SetEnv({key,value})
 InstallPackage({name,manager}) RemovePackage({name,manager}) ListPackages({manager}) Stdin({pid,input})
-Cron({id,schedule,command}) — schedule is a duration string: "30s", "5m", "2h". Repeats until process exits.
+Cron({id,schedule,command}) — schedule is a duration string: "30s", "5m", "2h". Repeats until process exits. Note: cron jobs are in-memory only and do NOT survive a restart.
 CronList({}) — list all active cron job ids. CronCancel({id}) — stop and remove a cron job.
 
 ### Modules
